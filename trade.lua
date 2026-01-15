@@ -31,16 +31,47 @@ LuaTrade.ATTRS {
 }
 
 
-local STATUS_COL_WIDTH = 7
+local STATUS_COL_WIDTH = 2
 local COUNT_COL_WIDTH = 4
 local VALUE_COL_WIDTH = 6
 local FILTER_HEIGHT = 18
 local CLASS_COL_WIDTH = 18
 local SUBCLASS_COL_WIDTH = 15
-local GROUPED_COL_WIDTH = 15
+local GROUPED_COL_WIDTH = 25
 
+local function get_generic_description(item)
+    local desc = dfhack.items.getReadableDescription(item)
+    -- local desc2 = dfhack.items.getDescription(item)
+
+    -- Pattern: ≡, -, +, *, #, (, ), {, }, [, ], <, >, «, »
+    desc = desc:gsub("[%-%+%*#≡%(%){}%[%]<>%z\174\175\240]", "")
+    
+    -- Strip "left" and "right" specifically for shoes/gloves
+    desc = desc:gsub("%f[%a][Ll]eft%f[%A]", "")
+    desc = desc:gsub("%f[%a][Rr]ight%f[%A]", "")
+    
+    -- Clean up double spaces from the removals
+    desc = desc:gsub("%s+", " "):gsub("^%s*(.-)%s*$", "%1")
+    
+    return desc
+end
+
+local function sort_by_count_desc(a, b)
+    local qa = a.data.quantity or 1
+    local qb = b.data.quantity or 1
+    if qa == qb then return sorting.sort_by_value_desc(a, b) end
+    return qa > qb
+end
+
+local function sort_by_count_asc(a, b)
+    local qa = a.data.quantity or 1
+    local qb = b.data.quantity or 1
+    if qa == qb then return sorting.sort_by_value_desc(a, b) end
+    return qa < qb
+end
 
 function LuaTrade:init()
+    self.path = {}
     self.cur_page = 1
     self.filters = {'', ''}
     self.predicate_contexts = {{name='trade_caravan'}, {name='trade_fort'}}
@@ -61,8 +92,8 @@ function LuaTrade:init()
                 {label='status'..common.CH_UP, value=sorting.sort_by_status_asc},
                 {label='value'..common.CH_DN, value=sorting.sort_by_value_desc},
                 {label='value'..common.CH_UP, value=sorting.sort_by_value_asc},
-                {label='cnt'..common.CH_DN, value=sorting.sort_by_count_desc},
-                {label='cnt'..common.CH_UP, value=sorting.sort_by_count_asc},
+                {label='cnt'..common.CH_DN, value=sort_by_count_desc},
+                {label='cnt'..common.CH_UP, value=sort_by_count_asc},
                 {label='class'..common.CH_DN, value=sorting.sort_by_class_desc},
                 {label='class'..common.CH_UP, value=sorting.sort_by_class_asc},
                 {label='subclass'..common.CH_DN, value=sorting.sort_by_subclass_desc},
@@ -153,6 +184,20 @@ function LuaTrade:init()
                     visible=function() return self.cur_page == 2 end,
                     subviews=common.get_info_widgets(self, {trade.mer.buy_prices}, true, self.predicate_contexts[2]),
                 },
+                widgets.Panel{
+                    frame={t=1, l=0, r=0, h=1},
+                    visible=function() return #self.path > 0 end,
+                    subviews={
+                        widgets.Label{
+                            frame={t=0, l=0},
+                            text={
+                                {text="< Back", pen=COLOR_LIGHTRED, key="CUSTOM_ESC", on_activate=function() self:go_back() end},
+                                {gap=1, text=function() return table.concat(self.path, " > ") end}
+                            },
+                            on_click=function() self:go_back() end,
+                        }
+                    }
+                },
             },
         },
         widgets.Panel{
@@ -163,9 +208,9 @@ function LuaTrade:init()
                     view_id='sort_status',
                     frame={t=0, l=0, w=7},
                     options={
-                        {label='status', value=sorting.sort_noop},
-                        {label='status'..common.CH_DN, value=sorting.sort_by_status_desc},
-                        {label='status'..common.CH_UP, value=sorting.sort_by_status_asc},
+                        {label='X', value=sorting.sort_noop},
+                        {label='X'..common.CH_DN, value=sorting.sort_by_status_desc},
+                        {label='X'..common.CH_UP, value=sorting.sort_by_status_asc},
                     },
                     initial_option=sorting.sort_by_status_desc,
                     option_gap=0,
@@ -173,11 +218,11 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_count',
-                    frame={t=0, l=STATUS_COL_WIDTH+1, w=COUNT_COL_WIDTH},
+                    frame={t=0, l=STATUS_COL_WIDTH, w=COUNT_COL_WIDTH},
                     options={
                         {label='Cnt', value=sorting.sort_noop},
-                        {label='Cnt'..common.CH_DN, value=sorting.sort_by_count_desc},
-                        {label='Cnt'..common.CH_UP, value=sorting.sort_by_count_asc},
+                        {label='Cnt'..common.CH_DN, value=sort_by_count_desc},
+                        {label='Cnt'..common.CH_UP, value=sort_by_count_asc},
                     },
                     on_change=self:callback('refresh_list', 'sort_count'),
                 },
@@ -215,7 +260,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_grouped',
-                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+2+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+2, w=GROUPED_COL_WIDTH},
+                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+2+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+1, w=GROUPED_COL_WIDTH},
                     options={
                         {label='Grouped', value=sorting.sort_noop},
                         {label='Grouped'..common.CH_DN, value=sorting.sort_by_grouped_desc},
@@ -238,7 +283,6 @@ function LuaTrade:init()
                     view_id='list',
                     frame={l=0, t=2, r=0, b=0},
                     icon_width=2,
-                    on_submit=self:callback('toggle_item'),
                     on_submit2=self:callback('toggle_range'),
                     on_select=self:callback('select_item'),
                 },
@@ -252,7 +296,7 @@ function LuaTrade:init()
         },
         widgets.Label{
             frame={b=2, l=0, r=0},
-            text='Click to mark/unmark for trade. Shift click to mark/unmark a range of items.',
+            text='Click X/Cnt/Value to mark/unmark for trade. Shift Class/Subclass/Grouped/name to drill down.',
         },
         widgets.HotkeyLabel{
             frame={l=0, b=0},
@@ -261,6 +305,13 @@ function LuaTrade:init()
             on_activate=self:callback('toggle_visible'),
             auto_width=true,
         },
+        widgets.Label{
+            frame={b=3, l=0, r=0},
+            text={
+                'Total value of selected items: ',
+                {text=function() return common.obfuscate_value(self:get_total_selected_value()) end, pen=COLOR_GREEN}
+            },
+        },
     }
 
     self.subviews.list.list.frame.t = 0
@@ -268,7 +319,47 @@ function LuaTrade:init()
     self.subviews.list.edit = self.subviews.search
     self.subviews.search.on_change = self.subviews.list:callback('onFilterChange')
 
+    local list_widget = self.subviews.list.list
+    local orig_onInput = list_widget.onInput
+    list_widget.onInput = function(widget, keys)
+        if keys.SELECT then
+            local idx = widget:getSelected()
+            local choices = self.subviews.list:getVisibleChoices()
+            if choices and choices[idx] then
+                self:toggle_item(idx, choices[idx], false)
+                return true
+            end
+        end
+        
+        local was_click = keys._MOUSE_L
+        local handled = orig_onInput(widget, keys)
+        if was_click and handled and widget:getMouseFramePos() then
+            local idx = widget:getSelected()
+            local choices = self.subviews.list:getVisibleChoices()
+            if choices and choices[idx] then
+                self:toggle_item(idx, choices[idx], true)
+            end
+        end
+        return handled
+    end
+
     self:reset_cache()
+end
+
+function LuaTrade:onBack()
+    if #self.path > 0 then
+        self:go_back()
+        return true
+    end
+    return false
+end
+
+function LuaTrade:go_back()
+    if #self.path > 0 then
+        table.remove(self.path)
+        self.subviews.list.list.page_top = 0
+        self:refresh_list()
+    end
 end
 
 function LuaTrade:refresh_list(sort_widget, sort_fn)
@@ -305,10 +396,25 @@ function LuaTrade:refresh_list(sort_widget, sort_fn)
     self._refreshing = false
 end
 
-local function make_choice_text(value, desc, class, subclass, grouped)
+function LuaTrade:get_total_selected_value()
+    local list_idx = self.cur_page - 1
+    local goodflags = trade.goodflag[list_idx]
+    local goods = trade.good[list_idx]
+    if not goodflags or not goods then return 0 end
+    
+    local total = 0
+    for i, item in ipairs(goods) do
+        if goodflags[i].selected then
+            total = total + common.get_perceived_value(item, trade.mer)
+        end
+    end
+    return total
+end
+
+local function make_choice_text(value, count, desc, class, subclass, grouped)
     return {
         {width=STATUS_COL_WIDTH-2, text=''},
-        {gap=1, width=COUNT_COL_WIDTH, rjustify=true, text='1'},
+        {gap=1, width=COUNT_COL_WIDTH, rjustify=true, text=count},
         {gap=1, width=VALUE_COL_WIDTH, rjustify=true, text=common.obfuscate_value(value)},
         {gap=2, width=CLASS_COL_WIDTH, text=class, pen=COLOR_CYAN},     -- Added width
         {gap=2, width=SUBCLASS_COL_WIDTH, text=subclass, pen=COLOR_GREY}, -- Added width
@@ -334,6 +440,7 @@ function LuaTrade:cache_choices(list_idx, trade_bins)
         local desc = dfhack.items.getReadableDescription(item)
         local is_ethical = ethics.is_ethical_product(item, self.animal_ethics, self.wood_ethics)
         local class, subclass = classifier.classify_item(item)
+        local group = get_generic_description(item) or "Other"
         local data = {
             desc=desc,
             value=common.get_perceived_value(item, trade.mer),
@@ -342,7 +449,7 @@ function LuaTrade:cache_choices(list_idx, trade_bins)
             item_idx=item_idx,
             class=class or 'Other',
             subclass=subclass or 'Other',
-            grouped='',
+            grouped=group,
             quality=item.flags.artifact and 6 or item:getQuality(),
             wear=wear_level,
             has_foreign=item.flags.foreign,
@@ -374,7 +481,7 @@ function LuaTrade:cache_choices(list_idx, trade_bins)
             search_key=search_key,
             icon=curry(sorting.get_entry_icon, data),
             data=data,
-            text=make_choice_text(data.value, desc, data.class, data.subclass, data.grouped),
+            text=make_choice_text(data.value, data.count or 1, desc, data.class, data.subclass, data.grouped),
         }
         if not data.update_container_fn then
             table.insert(trade_bins_choices, choice)
@@ -391,7 +498,7 @@ function LuaTrade:cache_choices(list_idx, trade_bins)
 end
 
 
-function LuaTrade:get_choices()
+function LuaTrade:get_flat_choices()
     local raw_choices = self:cache_choices(self.cur_page-1, self.subviews.trade_bins:getOptionValue())
     local provenance = self.subviews.provenance:getOptionValue()
     local banned = self.cur_page == 1 and 'ignore' or self.subviews.banned:getOptionValue()
@@ -441,6 +548,106 @@ function LuaTrade:get_choices()
     return choices
 end
 
+function LuaTrade:aggregate_choices(flat_choices)
+    if #self.path == 3 then
+        -- Leaf level: Items
+        local filtered = {}
+        for _, choice in ipairs(flat_choices) do
+            local d = choice.data
+            if d.class == self.path[1] and d.subclass == self.path[2] and d.grouped == self.path[3] then
+                table.insert(filtered, choice)
+            end
+        end
+        return filtered
+    end
+
+    local groups = {}
+    for _, choice in ipairs(flat_choices) do
+        local d = choice.data
+        local match = true
+        for i, p in ipairs(self.path) do
+            if i == 1 and d.class ~= p then match = false break end
+            if i == 2 and d.subclass ~= p then match = false break end
+        end
+        
+        if match then
+            local key
+            local class_val, subclass_val, grouped_val = "", "", ""
+            
+            if #self.path == 0 then 
+                key = d.class 
+                class_val = key
+            elseif #self.path == 1 then 
+                key = d.subclass 
+                class_val = self.path[1]
+                subclass_val = key
+            elseif #self.path == 2 then 
+                key = d.grouped 
+                class_val = self.path[1]
+                subclass_val = self.path[2]
+                grouped_val = key
+            end
+            
+            if not groups[key] then
+                groups[key] = {
+                    key = key,
+                    count = 0,
+                    value = 0,
+                    selected_count = 0,
+                    items = {},
+                    class = class_val,
+                    subclass = subclass_val,
+                    grouped = grouped_val
+                }
+            end
+            local g = groups[key]
+            g.count = g.count + 1
+            g.value = g.value + d.value
+            if trade.goodflag[d.list_idx][d.item_idx].selected then
+                g.selected_count = g.selected_count + 1
+            end
+            table.insert(g.items, choice)
+        end
+    end
+    
+    local choices = {}
+    for key, g in pairs(groups) do
+        local choice = {
+            data = {
+                desc = key,
+                value = g.value,
+                quantity = g.count,
+                is_group = true,
+                items = g.items,
+                class = g.class,
+                subclass = g.subclass,
+                grouped = g.grouped
+            },
+            search_key = key,
+        }
+        choice.icon = function() 
+            local sel = 0
+            for _, c in ipairs(g.items) do
+                if trade.goodflag[c.data.list_idx][c.data.item_idx].selected then
+                    sel = sel + 1
+                end
+            end
+            if sel == g.count then return common.ALL_PEN end
+            if sel > 0 then return common.SOME_PEN end
+            return nil
+        end
+        choice.text = make_choice_text(g.value, g.count, g.desc, g.class, g.subclass, g.grouped)
+        table.insert(choices, choice)
+    end
+    
+    return choices
+end
+
+function LuaTrade:get_choices()
+    local flat = self:get_flat_choices()
+    return self:aggregate_choices(flat)
+end
+
 local function toggle_item_base(choice, target_value)
     local goodflag = trade.goodflag[choice.data.list_idx][choice.data.item_idx]
     if target_value == nil then
@@ -454,14 +661,52 @@ local function toggle_item_base(choice, target_value)
     return target_value
 end
 
+function LuaTrade:toggle_group(choice)
+    local target = true
+    for _, item_choice in ipairs(choice.data.items) do
+        local goodflag = trade.goodflag[item_choice.data.list_idx][item_choice.data.item_idx]
+        if not goodflag.selected then
+            target = true
+            goto found
+        end
+    end
+    target = false
+    ::found::
+    
+    for _, item_choice in ipairs(choice.data.items) do
+        toggle_item_base(item_choice, target)
+    end
+end
+
 function LuaTrade:select_item(idx, choice)
     if not dfhack.internal.getModifiers().shift then
         self.prev_list_idx = self.subviews.list.list:getSelected()
     end
 end
 
-function LuaTrade:toggle_item(idx, choice)
-    toggle_item_base(choice)
+function LuaTrade:toggle_item(idx, choice, is_click)
+    local list_widget = self.subviews.list.list
+    local selection_width = STATUS_COL_WIDTH + COUNT_COL_WIDTH + VALUE_COL_WIDTH + 4
+    
+    if choice.data.is_group then
+        local drill_down = true
+        if is_click then
+            local x, y = list_widget:getMousePos()
+            if x and x < selection_width then
+                drill_down = false
+            end
+        end
+        
+        if not drill_down then
+             self:toggle_group(choice)
+        else
+            table.insert(self.path, choice.data.desc)
+            self.subviews.list.list.page_top = 0
+            self:refresh_list()
+        end
+    else
+        toggle_item_base(choice)
+    end
 end
 
 function LuaTrade:toggle_range(idx, choice)
@@ -508,6 +753,10 @@ end
 
 function TradeScreen:onInput(keys)
     if self.reset_pending then return false end
+    if (keys.LEAVESCREEN or keys._MOUSE_R) and self.trade_window:onBack() then
+        return true
+    end
+
     local handled = TradeScreen.super.onInput(self, keys)
     if keys._MOUSE_L and not self.trade_window:getMouseFramePos() then
         -- "trade" or "offer" buttons may have been clicked and we need to reset the cache
