@@ -9,6 +9,7 @@ local common = reqscript('internal/caravan/common')
 local gui = require('gui')
 local overlay = require('plugins.overlay')
 local predicates = reqscript('internal/caravan/predicates')
+local classifier = reqscript('internal/caravan/item_classifier') 
 local utils = require('utils')
 local widgets = require('gui.widgets')
 
@@ -26,7 +27,7 @@ local trade = df.global.game.main_interface.trade
 Trade = defclass(Trade, widgets.Window)
 Trade.ATTRS {
     frame_title='Select trade goods',
-    frame={w=86, h=47},
+    frame={w=130, h=47},
     resizable=true,
     resize_min={w=48, h=40},
 }
@@ -92,9 +93,22 @@ local function sort_by_status_asc(a, b)
     return b_selected
 end
 
+local function sort_by_class_desc(a, b)
+    if a.data.class == b.data.class then return sort_by_value_desc(a, b) end
+    return a.data.class < b.data.class
+end
+
+local function sort_by_subclass_desc(a, b)
+    if a.data.subclass == b.data.subclass then return sort_by_value_desc(a, b) end
+    return a.data.subclass < b.data.subclass
+end
+
 local STATUS_COL_WIDTH = 7
 local VALUE_COL_WIDTH = 6
 local FILTER_HEIGHT = 18
+local CLASS_COL_WIDTH = 18
+local SUBCLASS_COL_WIDTH = 15
+
 
 function Trade:init()
     self.cur_page = 1
@@ -231,8 +245,20 @@ function Trade:init()
                     on_change=self:callback('refresh_list', 'sort_value'),
                 },
                 widgets.CycleHotkeyLabel{
+                    view_id='sort_class',
+                    frame={t=0, l=STATUS_COL_WIDTH+VALUE_COL_WIDTH+3, w=CLASS_COL_WIDTH},
+                    options={{label='Class', value=sort_by_class_desc}},
+                    on_change=self:callback('refresh_list', 'sort_class'),
+                },
+                widgets.CycleHotkeyLabel{
+                    view_id='sort_subclass',
+                    frame={t=0, l=STATUS_COL_WIDTH+VALUE_COL_WIDTH+CLASS_COL_WIDTH+4, w=SUBCLASS_COL_WIDTH},
+                    options={{label='Subclass', value=sort_by_subclass_desc}},
+                    on_change=self:callback('refresh_list', 'sort_subclass'),
+                },
+                widgets.CycleHotkeyLabel{
                     view_id='sort_name',
-                    frame={t=0, l=STATUS_COL_WIDTH+2+VALUE_COL_WIDTH+2, w=5},
+                    frame={t=0, l=STATUS_COL_WIDTH+VALUE_COL_WIDTH+CLASS_COL_WIDTH+4+SUBCLASS_COL_WIDTH, w=5},
                     options={
                         {label='name', value=sort_noop},
                         {label='name'..common.CH_DN, value=sort_by_name_desc},
@@ -270,7 +296,6 @@ function Trade:init()
         },
     }
 
-    -- replace the FilteredList's built-in EditField with our own
     self.subviews.list.list.frame.t = 0
     self.subviews.list.edit.visible = false
     self.subviews.list.edit = self.subviews.search
@@ -315,9 +340,12 @@ local function is_ethical_product(item, animal_ethics, wood_ethics)
         (not wood_ethics or not common.has_wood(item))
 end
 
-local function make_choice_text(value, desc)
+
+local function make_choice_text(value, desc, class, subclass)
     return {
-        {width=STATUS_COL_WIDTH+VALUE_COL_WIDTH, rjustify=true, text=common.obfuscate_value(value)},
+        {width=STATUS_COL_WIDTH + VALUE_COL_WIDTH, rjustify=true, text=common.obfuscate_value(value)},
+        {gap=2, text=class},
+        {gap=2, text=subclass},
         {gap=2, text=desc},
     }
 end
@@ -338,12 +366,15 @@ function Trade:cache_choices(list_idx, trade_bins)
         local wear_level = item:getWear()
         local desc = dfhack.items.getReadableDescription(item)
         local is_ethical = is_ethical_product(item, self.animal_ethics, self.wood_ethics)
+        local class, subclass = classifier.classify_item(item)
         local data = {
             desc=desc,
             value=common.get_perceived_value(item, trade.mer),
             list_idx=list_idx,
             item=item,
             item_idx=item_idx,
+            class=class or 'Other',
+            subclass=subclass or 'Other',
             quality=item.flags.artifact and 6 or item:getQuality(),
             wear=wear_level,
             has_foreign=item.flags.foreign,
@@ -374,7 +405,7 @@ function Trade:cache_choices(list_idx, trade_bins)
             search_key=search_key,
             icon=curry(get_entry_icon, data),
             data=data,
-            text=make_choice_text(data.value, desc),
+            text=make_choice_text(data.value, desc, data.class, data.subclass),
         }
         if not data.update_container_fn then
             table.insert(trade_bins_choices, choice)
