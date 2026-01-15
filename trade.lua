@@ -417,14 +417,14 @@ local function is_ethical_product(item, animal_ethics, wood_ethics)
 end
 
 
-local function make_choice_text(value, desc, class, subclass)
+local function make_choice_text(value, desc, class, subclass, grouped)
     return {
         {width=STATUS_COL_WIDTH-2, text=''},
         {gap=1, width=COUNT_COL_WIDTH, rjustify=true, text='1'},
         {gap=1, width=VALUE_COL_WIDTH, rjustify=true, text=common.obfuscate_value(value)},
         {gap=2, width=CLASS_COL_WIDTH, text=class, pen=COLOR_CYAN},     -- Added width
         {gap=2, width=SUBCLASS_COL_WIDTH, text=subclass, pen=COLOR_GREY}, -- Added width
-        {gap=2, width=GROUPED_COL_WIDTH, text=''},
+        {gap=2, width=GROUPED_COL_WIDTH, text=grouped},
         {gap=2, text=desc},
     } 
 end
@@ -454,6 +454,7 @@ function Trade:cache_choices(list_idx, trade_bins)
             item_idx=item_idx,
             class=class or 'Other',
             subclass=subclass or 'Other',
+            grouped='',
             quality=item.flags.artifact and 6 or item:getQuality(),
             wear=wear_level,
             has_foreign=item.flags.foreign,
@@ -475,16 +476,17 @@ function Trade:cache_choices(list_idx, trade_bins)
         end
         local is_container = df.item_binst:is_instance(item)
         local search_key
+        local search_str = ('%s %s %s %s'):format(desc, data.class, data.subclass, data.grouped)
         if (trade_bins and is_container) or item:isFoodStorage() then
-            search_key = common.make_container_search_key(item, desc)
+            search_key = common.make_container_search_key(item, search_str)
         else
-            search_key = common.make_search_key(desc)
+            search_key = common.make_search_key(search_str)
         end
         local choice = {
             search_key=search_key,
             icon=curry(get_entry_icon, data),
             data=data,
-            text=make_choice_text(data.value, desc, data.class, data.subclass),
+            text=make_choice_text(data.value, desc, data.class, data.subclass, data.grouped),
         }
         if not data.update_container_fn then
             table.insert(trade_bins_choices, choice)

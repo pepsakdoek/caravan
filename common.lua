@@ -2,6 +2,7 @@
 
 local dialogs = require('gui.dialogs')
 local predicates = reqscript('internal/caravan/predicates')
+local classifier = reqscript('internal/caravan/item_classifier')
 local utils = require('utils')
 local widgets = require('gui.widgets')
 
@@ -31,6 +32,9 @@ function make_container_search_key(item, desc)
     add_words(words, desc)
     for _, contained_item in ipairs(dfhack.items.getContainedItems(item)) do
         add_words(words, dfhack.items.getReadableDescription(contained_item))
+        local class, subclass = classifier.classify_item(contained_item)
+        add_words(words, class)
+        add_words(words, subclass)
     end
     return table.concat(words, ' ')
 end
