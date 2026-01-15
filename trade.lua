@@ -98,7 +98,17 @@ local function sort_by_class_desc(a, b)
     return a.data.class < b.data.class
 end
 
+local function sort_by_class_asc(a, b)
+    if a.data.class == b.data.class then return sort_by_value_desc(a, b) end
+    return a.data.class > b.data.class
+end
+
 local function sort_by_subclass_desc(a, b)
+    if a.data.subclass == b.data.subclass then return sort_by_value_desc(a, b) end
+    return a.data.subclass < b.data.subclass
+end
+
+local function sort_by_subclass_asc(a, b)
     if a.data.subclass == b.data.subclass then return sort_by_value_desc(a, b) end
     return a.data.subclass < b.data.subclass
 end
@@ -131,6 +141,10 @@ function Trade:init()
                 {label='status'..common.CH_UP, value=sort_by_status_asc},
                 {label='value'..common.CH_DN, value=sort_by_value_desc},
                 {label='value'..common.CH_UP, value=sort_by_value_asc},
+                {label='class'..common.CH_DN, value=sort_by_class_desc},
+                {label='class'..common.CH_UP, value=sort_by_class_asc},
+                {label='subclass'..common.CH_DN, value=sort_by_subclass_desc},
+                {label='subclass'..common.CH_UP, value=sort_by_subclass_asc},
                 {label='name'..common.CH_DN, value=sort_by_name_desc},
                 {label='name'..common.CH_UP, value=sort_by_name_asc},
             },
@@ -246,19 +260,28 @@ function Trade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_class',
-                    frame={t=0, l=STATUS_COL_WIDTH+VALUE_COL_WIDTH+3, w=CLASS_COL_WIDTH},
-                    options={{label='Class', value=sort_by_class_desc}},
+                    frame={t=0, l=STATUS_COL_WIDTH+VALUE_COL_WIDTH+4, w=CLASS_COL_WIDTH},
+                    options={
+                        {label='Class', value=sort_noop},
+                        {label='Class'..common.CH_DN, value=sort_by_class_desc},
+                        {label='Class'..common.CH_UP, value=sort_by_class_asc},
+                    },
+                    option_gap=0,
                     on_change=self:callback('refresh_list', 'sort_class'),
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_subclass',
-                    frame={t=0, l=STATUS_COL_WIDTH+VALUE_COL_WIDTH+CLASS_COL_WIDTH+4, w=SUBCLASS_COL_WIDTH},
-                    options={{label='Subclass', value=sort_by_subclass_desc}},
+                    frame={t=0, l=STATUS_COL_WIDTH+VALUE_COL_WIDTH+CLASS_COL_WIDTH+5, w=SUBCLASS_COL_WIDTH},
+                    options={
+                        {label='Sublass', value=sort_noop},
+                        {label='Sublass'..common.CH_DN, value=sort_by_subclass_desc},
+                        {label='Sublass'..common.CH_UP, value=sort_by_subclass_asc},
+                    },
                     on_change=self:callback('refresh_list', 'sort_subclass'),
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_name',
-                    frame={t=0, l=STATUS_COL_WIDTH+VALUE_COL_WIDTH+CLASS_COL_WIDTH+4+SUBCLASS_COL_WIDTH, w=5},
+                    frame={t=0, l=STATUS_COL_WIDTH+VALUE_COL_WIDTH+CLASS_COL_WIDTH+8+SUBCLASS_COL_WIDTH, w=5},
                     options={
                         {label='name', value=sort_noop},
                         {label='name'..common.CH_DN, value=sort_by_name_desc},
@@ -307,13 +330,24 @@ end
 function Trade:refresh_list(sort_widget, sort_fn)
     sort_widget = sort_widget or 'sort'
     sort_fn = sort_fn or self.subviews.sort:getOptionValue()
+    
     if sort_fn == sort_noop then
         self.subviews[sort_widget]:cycle()
         return
     end
-    for _,widget_name in ipairs{'sort', 'sort_status', 'sort_value', 'sort_name'} do
-        self.subviews[widget_name]:setOption(sort_fn)
+
+    -- Update ALL sort-related widgets to match the current active sort function
+    local sort_widgets = {
+        'sort', 'sort_status', 'sort_value', 
+        'sort_name', 'sort_class', 'sort_subclass' -- Add your new widgets here
+    }
+    
+    for _, widget_name in ipairs(sort_widgets) do
+        if self.subviews[widget_name] then
+            self.subviews[widget_name]:setOption(sort_fn)
+        end
     end
+
     local list = self.subviews.list
     local saved_filter = list:getFilter()
     local saved_top = list.list.page_top
@@ -344,8 +378,8 @@ end
 local function make_choice_text(value, desc, class, subclass)
     return {
         {width=STATUS_COL_WIDTH + VALUE_COL_WIDTH, rjustify=true, text=common.obfuscate_value(value)},
-        {gap=2, text=class},
-        {gap=2, text=subclass},
+        {gap=2, width=CLASS_COL_WIDTH, text=class, pen=COLOR_CYAN},     -- Added width
+        {gap=2, width=SUBCLASS_COL_WIDTH, text=subclass, pen=COLOR_GREY}, -- Added width
         {gap=2, text=desc},
     }
 end
