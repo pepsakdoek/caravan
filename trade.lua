@@ -22,8 +22,8 @@ local trade = df.global.game.main_interface.trade
 -- Trade
 --
 
-Trade = defclass(Trade, widgets.Window)
-Trade.ATTRS {
+LuaTrade = defclass(LuaTrade, widgets.Window)
+LuaTrade.ATTRS {
     frame_title='Select trade goods',
     frame={w=150, h=47},
     resizable=true,
@@ -40,7 +40,7 @@ local SUBCLASS_COL_WIDTH = 15
 local GROUPED_COL_WIDTH = 15
 
 
-function Trade:init()
+function LuaTrade:init()
     self.cur_page = 1
     self.filters = {'', ''}
     self.predicate_contexts = {{name='trade_caravan'}, {name='trade_fort'}}
@@ -271,7 +271,7 @@ function Trade:init()
     self:reset_cache()
 end
 
-function Trade:refresh_list(sort_widget, sort_fn)
+function LuaTrade:refresh_list(sort_widget, sort_fn)
     if self._refreshing then return end
     self._refreshing = true
     sort_widget = sort_widget or 'sort'
@@ -317,7 +317,7 @@ local function make_choice_text(value, desc, class, subclass, grouped)
     } 
 end
 
-function Trade:cache_choices(list_idx, trade_bins)
+function LuaTrade:cache_choices(list_idx, trade_bins)
     if self.choices[list_idx][trade_bins] then return self.choices[list_idx][trade_bins] end
 
     local goodflags = trade.goodflag[list_idx]
@@ -391,7 +391,7 @@ function Trade:cache_choices(list_idx, trade_bins)
 end
 
 
-function Trade:get_choices()
+function LuaTrade:get_choices()
     local raw_choices = self:cache_choices(self.cur_page-1, self.subviews.trade_bins:getOptionValue())
     local provenance = self.subviews.provenance:getOptionValue()
     local banned = self.cur_page == 1 and 'ignore' or self.subviews.banned:getOptionValue()
@@ -454,17 +454,17 @@ local function toggle_item_base(choice, target_value)
     return target_value
 end
 
-function Trade:select_item(idx, choice)
+function LuaTrade:select_item(idx, choice)
     if not dfhack.internal.getModifiers().shift then
         self.prev_list_idx = self.subviews.list.list:getSelected()
     end
 end
 
-function Trade:toggle_item(idx, choice)
+function LuaTrade:toggle_item(idx, choice)
     toggle_item_base(choice)
 end
 
-function Trade:toggle_range(idx, choice)
+function LuaTrade:toggle_range(idx, choice)
     if not self.prev_list_idx then
         self:toggle_item(idx, choice)
         return
@@ -478,14 +478,14 @@ function Trade:toggle_range(idx, choice)
     self.prev_list_idx = list_idx
 end
 
-function Trade:toggle_visible()
+function LuaTrade:toggle_visible()
     local target_value
     for _, choice in ipairs(self.subviews.list:getVisibleChoices()) do
         target_value = toggle_item_base(choice, target_value)
     end
 end
 
-function Trade:reset_cache()
+function LuaTrade:reset_cache()
     self.choices = {[0]={}, [1]={}}
     self:refresh_list()
 end
@@ -502,7 +502,7 @@ TradeScreen.ATTRS {
 }
 
 function TradeScreen:init()
-    self.trade_window = Trade{}
+    self.trade_window = LuaTrade{}
     self:addviews{self.trade_window}
 end
 
