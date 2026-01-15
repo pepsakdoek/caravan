@@ -1,6 +1,16 @@
 --@ module = true
 local M = {}
 
+-- TODO:
+-- Coal is counted as metal bars
+-- Gems are sorted under Miscellaneous
+-- Toys are sorted under Miscellaneous
+-- Lots of foods are marked as Misc
+--   berries, capers, leaves 
+-- Splints & crutches are misc (could be medical? new def)
+-- Parchment are misc
+-- Items in containers I think are all other
+
 --------------------------------------------------------------------------
 -- PART 1: ITEM CLASSIFIER LOGIC
 ---------------------------------------------------------------------------
@@ -101,7 +111,7 @@ HIERARCHY = {
         }
     },
     {
-        id = "AmmoAndTraps",
+        id = "Ammo & Traps",
         engine_types = {df.item_type.AMMO, df.item_type.TRAPCOMP},
         subclasses = {
             { id = "Ammo", item_type = df.item_type.AMMO },
@@ -110,13 +120,13 @@ HIERARCHY = {
         }
     },
     {
-        id = "ToolsAndEquipment",
+        id = "Tools & Equipment",
         engine_types = {df.item_type.TOOL, df.item_type.FLASK, df.item_type.GOBLET, df.item_type.BUCKET, df.item_type.CHAIN, df.item_type.QUIVER},
         subclasses = {
-            { id = "LiquidContainers", item_types = {df.item_type.FLASK, df.item_type.GOBLET, df.item_type.BUCKET} },
+            { id = "Liquid Containers", item_types = {df.item_type.FLASK, df.item_type.GOBLET, df.item_type.BUCKET} },
             { id = "Restraints", item_type = df.item_type.CHAIN },
             { id = "Quivers", item_type = df.item_type.QUIVER },
-            { id = "GeneralTools", item_type = df.item_type.TOOL },
+            { id = "General Tools", item_type = df.item_type.TOOL },
             { id = "Other", fallback = true }
         }
     },
@@ -146,38 +156,38 @@ HIERARCHY = {
         }
     },
     {
-        id = "FinishedGoods",
+        id = "Finished Goods",
         engine_types = {df.item_type.CRAFTS, df.item_type.TOY, df.item_type.INSTRUMENT, df.item_type.BOOK, df.item_type.SCROLL, df.item_type.SHEET},
         subclasses = {
             { id = "Crafts", item_type = df.item_type.CRAFTS },
             { id = "Toys", item_type = df.item_type.TOY },
             { id = "Instruments", item_type = df.item_type.INSTRUMENT },
-            { id = "BooksAndWriting", item_types = {df.item_type.BOOK, df.item_type.SCROLL, df.item_type.SHEET} },
+            { id = "Books & Writing", item_types = {df.item_type.BOOK, df.item_type.SCROLL, df.item_type.SHEET} },
             { id = "Other", fallback = true }
         }
     },
     {
-        id = "RawMaterials",
+        id = "Raw Materials",
         engine_types = {df.item_type.BAR, df.item_type.BLOCKS, df.item_type.BOULDER, df.item_type.WOOD, df.item_type.CLOTH, df.item_type.THREAD, df.item_type.LEATHER, df.item_type.SKIN_TANNED, df.item_type.GLOB, df.item_type.POWDER_MISC, df.item_type.LIQUID_MISC},
         subclasses = {
-            { id = "MetalBars", item_type = df.item_type.BAR },
+            { id = "Metal Bars", item_type = df.item_type.BAR },
             { id = "Stone", item_types = {df.item_type.BLOCKS, df.item_type.BOULDER} },
             { id = "Wood", item_type = df.item_type.WOOD },
             { id = "Textiles", item_types = {df.item_type.CLOTH, df.item_type.THREAD} },
-            { id = "LeatherAndSkins", item_types = {df.item_type.LEATHER, df.item_type.SKIN_TANNED} },
-            { id = "PowdersAndLiquids", item_types = {df.item_type.POWDER_MISC, df.item_type.LIQUID_MISC, df.item_type.GLOB} },
+            { id = "Leather & Skins", item_types = {df.item_type.LEATHER, df.item_type.SKIN_TANNED} },
+            { id = "Powders & Liquids", item_types = {df.item_type.POWDER_MISC, df.item_type.LIQUID_MISC, df.item_type.GLOB} },
             { id = "Other", fallback = true }
         }
     },
     {
-        id = "FoodAndConsumables",
+        id = "Food & Consumables",
         engine_types = {df.item_type.FOOD, df.item_type.DRINK, df.item_type.PLANT, df.item_type.SEEDS, df.item_type.MEAT, df.item_type.FISH, df.item_type.FISH_RAW, df.item_type.CHEESE, df.item_type.EGG, df.item_type.HONEYCOMB},
         subclasses = {
-            { id = "PreparedFood", item_type = df.item_type.FOOD },
+            { id = "Prepared Food", item_type = df.item_type.FOOD },
             { id = "Drinks", item_type = df.item_type.DRINK },
             { id = "Plants", item_type = df.item_type.PLANT },
-            { id = "MeatAndFish", item_types = {df.item_type.MEAT, df.item_type.FISH, df.item_type.FISH_RAW} },
-            { id = "DairyAndEggs", item_types = {df.item_type.CHEESE, df.item_type.EGG} },
+            { id = "Meat & Fish", item_types = {df.item_type.MEAT, df.item_type.FISH, df.item_type.FISH_RAW} },
+            { id = "Dairy & Eggs", item_types = {df.item_type.CHEESE, df.item_type.EGG} },
             { id = "Seeds", item_type = df.item_type.SEEDS },
             { id = "Other", fallback = true }
         }
@@ -186,7 +196,7 @@ HIERARCHY = {
         id = "Animals",
         engine_types = {df.item_type.ANIMAL},
         subclasses = {
-            { id = "CagedAnimals", item_type = df.item_type.ANIMAL },
+            { id = "Caged Animals", item_type = df.item_type.ANIMAL },
             { id = "Other", fallback = true }
         }
     },

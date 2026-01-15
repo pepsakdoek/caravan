@@ -113,11 +113,29 @@ local function sort_by_subclass_asc(a, b)
     return a.data.subclass < b.data.subclass
 end
 
+local function sort_by_count_desc(a, b)
+    return sort_by_value_desc(a, b)
+end
+
+local function sort_by_count_asc(a, b)
+    return sort_by_value_asc(a, b)
+end
+
+local function sort_by_grouped_desc(a, b)
+    return sort_by_value_desc(a, b)
+end
+
+local function sort_by_grouped_asc(a, b)
+    return sort_by_value_asc(a, b)
+end
+
 local STATUS_COL_WIDTH = 7
+local COUNT_COL_WIDTH = 4
 local VALUE_COL_WIDTH = 6
 local FILTER_HEIGHT = 18
 local CLASS_COL_WIDTH = 18
 local SUBCLASS_COL_WIDTH = 15
+local GROUPED_COL_WIDTH = 15
 
 
 function Trade:init()
@@ -141,10 +159,14 @@ function Trade:init()
                 {label='status'..common.CH_UP, value=sort_by_status_asc},
                 {label='value'..common.CH_DN, value=sort_by_value_desc},
                 {label='value'..common.CH_UP, value=sort_by_value_asc},
+                {label='cnt'..common.CH_DN, value=sort_by_count_desc},
+                {label='cnt'..common.CH_UP, value=sort_by_count_asc},
                 {label='class'..common.CH_DN, value=sort_by_class_desc},
                 {label='class'..common.CH_UP, value=sort_by_class_asc},
                 {label='subclass'..common.CH_DN, value=sort_by_subclass_desc},
                 {label='subclass'..common.CH_UP, value=sort_by_subclass_asc},
+                {label='grp'..common.CH_DN, value=sort_by_grouped_desc},
+                {label='grp'..common.CH_UP, value=sort_by_grouped_asc},
                 {label='name'..common.CH_DN, value=sort_by_name_desc},
                 {label='name'..common.CH_UP, value=sort_by_name_asc},
             },
@@ -248,8 +270,18 @@ function Trade:init()
                     on_change=self:callback('refresh_list', 'sort_status'),
                 },
                 widgets.CycleHotkeyLabel{
+                    view_id='sort_count',
+                    frame={t=0, l=STATUS_COL_WIDTH+1, w=COUNT_COL_WIDTH},
+                    options={
+                        {label='Cnt', value=sort_noop},
+                        {label='Cnt'..common.CH_DN, value=sort_by_count_desc},
+                        {label='Cnt'..common.CH_UP, value=sort_by_count_asc},
+                    },
+                    on_change=self:callback('refresh_list', 'sort_count'),
+                },
+                widgets.CycleHotkeyLabel{
                     view_id='sort_value',
-                    frame={t=0, l=STATUS_COL_WIDTH+2+VALUE_COL_WIDTH+1-6, w=6},
+                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1, w=VALUE_COL_WIDTH},
                     options={
                         {label='value', value=sort_noop},
                         {label='value'..common.CH_DN, value=sort_by_value_desc},
@@ -260,7 +292,7 @@ function Trade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_class',
-                    frame={t=0, l=STATUS_COL_WIDTH+VALUE_COL_WIDTH+4, w=CLASS_COL_WIDTH},
+                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+2, w=CLASS_COL_WIDTH},
                     options={
                         {label='Class', value=sort_noop},
                         {label='Class'..common.CH_DN, value=sort_by_class_desc},
@@ -271,17 +303,27 @@ function Trade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_subclass',
-                    frame={t=0, l=STATUS_COL_WIDTH+VALUE_COL_WIDTH+CLASS_COL_WIDTH+5, w=SUBCLASS_COL_WIDTH},
+                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+2+CLASS_COL_WIDTH+1, w=SUBCLASS_COL_WIDTH},
                     options={
-                        {label='Sublass', value=sort_noop},
-                        {label='Sublass'..common.CH_DN, value=sort_by_subclass_desc},
-                        {label='Sublass'..common.CH_UP, value=sort_by_subclass_asc},
+                        {label='Subclass', value=sort_noop},
+                        {label='Subclass'..common.CH_DN, value=sort_by_subclass_desc},
+                        {label='Subclass'..common.CH_UP, value=sort_by_subclass_asc},
                     },
                     on_change=self:callback('refresh_list', 'sort_subclass'),
                 },
                 widgets.CycleHotkeyLabel{
+                    view_id='sort_grouped',
+                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+2+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+2, w=GROUPED_COL_WIDTH},
+                    options={
+                        {label='Grouped', value=sort_noop},
+                        {label='Grouped'..common.CH_DN, value=sort_by_grouped_desc},
+                        {label='Grouped'..common.CH_UP, value=sort_by_grouped_asc},
+                    },
+                    on_change=self:callback('refresh_list', 'sort_grouped'),
+                },
+                widgets.CycleHotkeyLabel{
                     view_id='sort_name',
-                    frame={t=0, l=STATUS_COL_WIDTH+VALUE_COL_WIDTH+CLASS_COL_WIDTH+8+SUBCLASS_COL_WIDTH, w=5},
+                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+2+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+2+GROUPED_COL_WIDTH+2, w=5},
                     options={
                         {label='name', value=sort_noop},
                         {label='name'..common.CH_DN, value=sort_by_name_desc},
@@ -377,11 +419,14 @@ end
 
 local function make_choice_text(value, desc, class, subclass)
     return {
-        {width=STATUS_COL_WIDTH + VALUE_COL_WIDTH, rjustify=true, text=common.obfuscate_value(value)},
+        {width=STATUS_COL_WIDTH-2, text=''},
+        {gap=1, width=COUNT_COL_WIDTH, rjustify=true, text='1'},
+        {gap=1, width=VALUE_COL_WIDTH, rjustify=true, text=common.obfuscate_value(value)},
         {gap=2, width=CLASS_COL_WIDTH, text=class, pen=COLOR_CYAN},     -- Added width
         {gap=2, width=SUBCLASS_COL_WIDTH, text=subclass, pen=COLOR_GREY}, -- Added width
+        {gap=2, width=GROUPED_COL_WIDTH, text=''},
         {gap=2, text=desc},
-    }
+    } 
 end
 
 function Trade:cache_choices(list_idx, trade_bins)
