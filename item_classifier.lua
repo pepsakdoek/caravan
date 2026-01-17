@@ -10,6 +10,8 @@ local M = {}
 -- Splints & crutches are misc (could be medical? new def)
 -- Parchment are misc
 -- Items in containers I think are all other
+-- Cloth and thread and (maybe) leather are raw materials and I think it should fall under 1 grouped one
+
 
 --------------------------------------------------------------------------
 -- PART 1: ITEM CLASSIFIER LOGIC

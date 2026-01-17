@@ -50,6 +50,8 @@ local function get_generic_description(item)
     desc = desc:gsub("%f[%a][Ll]eft%f[%A]", "")
     desc = desc:gsub("%f[%a][Rr]ight%f[%A]", "")
     
+    -- Remove the material from the desc
+    
     -- Clean up double spaces from the removals
     desc = desc:gsub("%s+", " "):gsub("^%s*(.-)%s*$", "%1")
     
@@ -793,7 +795,7 @@ TradeOverlay = tradeoverlay.TradeOverlay
 TradeBannerOverlay = defclass(TradeBannerOverlay, overlay.OverlayWidget)
 TradeBannerOverlay.ATTRS{
     desc='Adds link to the trade screen to launch the DFHack trade UI.',
-    default_pos={x=-31,y=-7},
+    default_pos={x=-31,y=-6},
     default_enabled=true,
     viewscreens='dwarfmode/Trade/Default',
     frame={w=25, h=1},
@@ -804,7 +806,7 @@ function TradeBannerOverlay:init()
     self:addviews{
         widgets.TextButton{
             frame={t=0, l=0},
-            label='DFHack trade UI',
+            label='Pivot trade UI',
             key='CUSTOM_CTRL_T',
             enabled=function() return trade.stillunloading == 0 and trade.havetalker == 1 end,
             on_activate=function() trade_view = trade_view and trade_view:raise() or TradeScreen{}:show() end,
