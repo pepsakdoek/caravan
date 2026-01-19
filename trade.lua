@@ -472,18 +472,19 @@ function LuaTrade:cache_choices(list_idx, trade_bins)
             parent_data.has_ethical = parent_data.has_ethical or is_ethical
         end
         local is_container = df.item_binst:is_instance(item)
-        local search_key
         local search_str = ('%s %s %s %s'):format(desc, data.class, data.subclass, data.grouped)
+        -- store normalized search key on the data so searching can operate across
+        -- all items, even when aggregated/grouped
         if (trade_bins and is_container) or item:isFoodStorage() then
-            search_key = common.make_container_search_key(item, search_str)
+            data.search_key = common.make_container_search_key(item, search_str)
         else
-            search_key = common.make_search_key(search_str)
+            data.search_key = common.make_search_key(search_str)
         end
         local choice = {
-            search_key=search_key,
-            icon=curry(sorting.get_entry_icon, data),
-            data=data,
-            text=make_choice_text(data.value, data.count or 1, desc, data.class, data.subclass, data.grouped),
+            search_key = data.search_key,
+            icon = curry(sorting.get_entry_icon, data),
+            data = data,
+            text = make_choice_text(data.value, data.count or 1, desc, data.class, data.subclass, data.grouped),
         }
         if not data.update_container_fn then
             table.insert(trade_bins_choices, choice)
@@ -625,8 +626,13 @@ function LuaTrade:aggregate_choices(flat_choices)
                 subclass = g.subclass,
                 grouped = g.grouped
             },
-            search_key = key,
         }
+        -- Build a combined search_key from all child items plus the group labels
+        local combined = {key, g.class, g.subclass, g.grouped}
+        for _,c in ipairs(g.items) do
+            if c.search_key then table.insert(combined, c.search_key) end
+        end
+        choice.search_key = common.make_search_key(table.concat(combined, ' '))
         choice.icon = function() 
             local sel = 0
             for _, c in ipairs(g.items) do
