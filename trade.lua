@@ -261,7 +261,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_name',
-                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+2+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+2+GROUPED_COL_WIDTH+2, w=30},
+                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+2+GROUPED_COL_WIDTH+2, w=30},
                     options={
                         {label='Item Description', value=sorting.sort_noop},
                         {label='Item Description'..common.CH_DN, value=sorting.sort_by_name_desc},
@@ -324,7 +324,26 @@ function LuaTrade:init()
         
         local was_click = keys._MOUSE_L
         local handled = orig_onInput(widget, keys)
-        if was_click and handled and widget:getMouseFramePos() then
+        if was_click and handled then
+            -- Get local mouse coords from the widget. If unavailable, let the
+            -- original handler manage the event (likely a drag/scroll).
+            local x, y = nil, nil
+            if widget.getMousePos then x, y = widget:getMousePos() end
+            
+            
+            -- Try fix scrollbar clicks being interpreted as drill downs
+            local widget_w = nil
+            if widget.frame and widget.frame.w then widget_w = widget.frame.w end
+            if (not widget_w) and self.subviews.list and self.subviews.list.frame and self.subviews.list.frame.w then
+                widget_w = self.subviews.list.frame.w
+            end
+            if (not widget_w) and self.frame and self.frame.w then widget_w = self.frame.w end
+
+            local scrollbar_reserved = 3
+            if widget_w and widget_w > 0 and x >= widget_w - scrollbar_reserved then
+                return handled
+            end
+
             local idx = widget:getSelected()
             local choices = self.subviews.list:getVisibleChoices()
             if choices and choices[idx] then
@@ -703,7 +722,7 @@ end
 
 function LuaTrade:toggle_item(idx, choice, is_click)
     local list_widget = self.subviews.list.list
-    local selection_width = STATUS_COL_WIDTH + COUNT_COL_WIDTH + VALUE_COL_WIDTH + 4
+    local selection_width = STATUS_COL_WIDTH + COUNT_COL_WIDTH + VALUE_COL_WIDTH + 1
     
     if choice.data.is_group then
         local drill_down = true
