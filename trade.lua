@@ -58,19 +58,7 @@ local function get_generic_description(item)
     return desc
 end
 
-local function sort_by_count_desc(a, b)
-    local qa = a.data.quantity or 1
-    local qb = b.data.quantity or 1
-    if qa == qb then return sorting.sort_by_value_desc(a, b) end
-    return qa > qb
-end
 
-local function sort_by_count_asc(a, b)
-    local qa = a.data.quantity or 1
-    local qb = b.data.quantity or 1
-    if qa == qb then return sorting.sort_by_value_desc(a, b) end
-    return qa < qb
-end
 
 function LuaTrade:init()
     self.path = {}
@@ -92,10 +80,10 @@ function LuaTrade:init()
             options={
                 {label='status'..common.CH_DN, value=sorting.sort_by_status_desc},
                 {label='status'..common.CH_UP, value=sorting.sort_by_status_asc},
+                {label='cnt'..common.CH_DN, value=sorting.sort_by_count_desc},
+                {label='cnt'..common.CH_UP, value=sorting.sort_by_count_asc},
                 {label='value'..common.CH_DN, value=sorting.sort_by_value_desc},
                 {label='value'..common.CH_UP, value=sorting.sort_by_value_asc},
-                {label='cnt'..common.CH_DN, value=sort_by_count_desc},
-                {label='cnt'..common.CH_UP, value=sort_by_count_asc},
                 {label='class'..common.CH_DN, value=sorting.sort_by_class_desc},
                 {label='class'..common.CH_UP, value=sorting.sort_by_class_asc},
                 {label='subclass'..common.CH_DN, value=sorting.sort_by_subclass_desc},
@@ -208,7 +196,7 @@ function LuaTrade:init()
             subviews={
                 widgets.CycleHotkeyLabel{
                     view_id='sort_status',
-                    frame={t=0, l=0, w=7},
+                    frame={t=0, l=0, w=STATUS_COL_WIDTH},
                     options={
                         {label='X', value=sorting.sort_noop},
                         {label='X'..common.CH_DN, value=sorting.sort_by_status_desc},
@@ -220,28 +208,29 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_count',
-                    frame={t=0, l=STATUS_COL_WIDTH, w=COUNT_COL_WIDTH},
+                    frame={t=0, l=STATUS_COL_WIDTH+1, w=COUNT_COL_WIDTH},
                     options={
                         {label='Cnt', value=sorting.sort_noop},
-                        {label='Cnt'..common.CH_DN, value=sort_by_count_desc},
-                        {label='Cnt'..common.CH_UP, value=sort_by_count_asc},
+                        {label='Cnt'..common.CH_DN, value=sorting.sort_by_count_desc},
+                        {label='Cnt'..common.CH_UP, value=sorting.sort_by_count_asc},
                     },
+                    option_gap=0,
                     on_change=self:callback('refresh_list', 'sort_count'),
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_value',
                     frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1, w=VALUE_COL_WIDTH},
                     options={
-                        {label='value', value=sorting.sort_noop},
-                        {label='value'..common.CH_DN, value=sorting.sort_by_value_desc},
-                        {label='value'..common.CH_UP, value=sorting.sort_by_value_asc},
+                        {label='Value', value=sorting.sort_noop},
+                        {label='Value'..common.CH_DN, value=sorting.sort_by_value_desc},
+                        {label='Value'..common.CH_UP, value=sorting.sort_by_value_asc},
                     },
                     option_gap=0,
                     on_change=self:callback('refresh_list', 'sort_value'),
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_class',
-                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+2, w=CLASS_COL_WIDTH},
+                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1, w=CLASS_COL_WIDTH},
                     options={
                         {label='Class', value=sorting.sort_noop},
                         {label='Class'..common.CH_DN, value=sorting.sort_by_class_desc},
@@ -252,7 +241,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_subclass',
-                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+2+CLASS_COL_WIDTH+1, w=SUBCLASS_COL_WIDTH},
+                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+CLASS_COL_WIDTH+1, w=SUBCLASS_COL_WIDTH},
                     options={
                         {label='Subclass', value=sorting.sort_noop},
                         {label='Subclass'..common.CH_DN, value=sorting.sort_by_subclass_desc},
@@ -262,7 +251,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_grouped',
-                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+2+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+1, w=GROUPED_COL_WIDTH},
+                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+1, w=GROUPED_COL_WIDTH},
                     options={
                         {label='Grouped', value=sorting.sort_noop},
                         {label='Grouped'..common.CH_DN, value=sorting.sort_by_grouped_desc},
@@ -272,11 +261,11 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_name',
-                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+2+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+2+GROUPED_COL_WIDTH+2, w=5},
+                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+2+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+2+GROUPED_COL_WIDTH+2, w=30},
                     options={
-                        {label='name', value=sorting.sort_noop},
-                        {label='name'..common.CH_DN, value=sorting.sort_by_name_desc},
-                        {label='name'..common.CH_UP, value=sorting.sort_by_name_asc},
+                        {label='Item Description', value=sorting.sort_noop},
+                        {label='Item Description'..common.CH_DN, value=sorting.sort_by_name_desc},
+                        {label='Item Description'..common.CH_UP, value=sorting.sort_by_name_asc},
                     },
                     option_gap=0,
                     on_change=self:callback('refresh_list', 'sort_name'),
@@ -298,7 +287,7 @@ function LuaTrade:init()
         },
         widgets.Label{
             frame={b=2, l=0, r=0},
-            text='Click X/Cnt/Value to mark/unmark for trade. Shift Class/Subclass/Grouped/name to drill down.',
+            text='Click X/Cnt/Value to mark/unmark for trade. Click Class/Subclass/Grouped/Item Description to drill down.',
         },
         widgets.HotkeyLabel{
             frame={l=0, b=0},
@@ -415,7 +404,7 @@ end
 
 local function make_choice_text(value, count, desc, class, subclass, grouped)
     return {
-        {width=STATUS_COL_WIDTH-2, text=''},
+        {width=STATUS_COL_WIDTH-3, text=''},
         {gap=1, width=COUNT_COL_WIDTH, rjustify=true, text=count},
         {gap=1, width=VALUE_COL_WIDTH, rjustify=true, text=common.obfuscate_value(value)},
         {gap=2, width=CLASS_COL_WIDTH, text=class, pen=COLOR_CYAN},     -- Added width
@@ -565,6 +554,7 @@ function LuaTrade:aggregate_choices(flat_choices)
     end
 
     local groups = {}
+    local order = {}
     for _, choice in ipairs(flat_choices) do
         local d = choice.data
         local match = true
@@ -602,6 +592,7 @@ function LuaTrade:aggregate_choices(flat_choices)
                     subclass = subclass_val,
                     grouped = grouped_val
                 }
+                table.insert(order, key)
             end
             local g = groups[key]
             g.count = g.count + 1
@@ -614,7 +605,10 @@ function LuaTrade:aggregate_choices(flat_choices)
     end
     
     local choices = {}
-    for key, g in pairs(groups) do
+    -- Preserve the order groups were first encountered in the already-sorted
+    -- flat_choices so aggregation doesn't disrupt the active sort order.
+    for _, key in ipairs(order) do
+        local g = groups[key]
         local choice = {
             data = {
                 desc = key,
@@ -648,6 +642,21 @@ function LuaTrade:aggregate_choices(flat_choices)
         table.insert(choices, choice)
     end
     
+    -- If the user selected sorting by an aggregated field (value or count),
+    -- sort the groups by the aggregated metric rather than by the underlying
+    -- item-level ordering.
+    local sort_fn = nil
+    if self.subviews and self.subviews.sort then sort_fn = self.subviews.sort:getOptionValue() end
+    if sort_fn == sorting.sort_by_value_desc then
+        table.sort(choices, sorting.sort_by_value_desc)
+    elseif sort_fn == sorting.sort_by_value_asc then
+        table.sort(choices, sorting.sort_by_value_asc)
+    elseif sort_fn == sorting.sort_by_count_desc then
+        table.sort(choices, sorting.sort_by_count_desc)
+    elseif sort_fn == sorting.sort_by_count_asc then
+        table.sort(choices, sorting.sort_by_count_asc)
+    end
+
     return choices
 end
 
