@@ -340,6 +340,16 @@ function LuaTrade:init()
     local list_widget = self.subviews.list.list
     local orig_onInput = list_widget.onInput
     list_widget.onInput = function(widget, keys)
+        if not self.search_active and (keys.SEC_SELECT or keys._STRING == 32) then
+            local idx = widget:getSelected()
+            if not idx then return end
+            local choices = self.subviews.list:getVisibleChoices()
+            if choices and choices[idx] then
+                self:toggle_item_base(choices[idx])
+                return true
+            end
+        end
+
         if keys.SELECT then
             local idx = widget:getSelected()
             if not idx then return end
@@ -815,6 +825,7 @@ function LuaTrade:toggle_group(choice, target_value)
     end
 end
 
+
 function LuaTrade:toggle_item(idx, choice, is_click)
     local modifiers = dfhack.internal.getModifiers()
     local list_widget = self.subviews.list.list
@@ -845,6 +856,7 @@ function LuaTrade:toggle_item(idx, choice, is_click)
     end
 end
 
+
 function LuaTrade:toggle_range(idx, choice)
     local list_idx = self.subviews.list.list:getSelected()
     if not self.prev_list_idx or self.prev_list_idx == list_idx then
@@ -862,6 +874,8 @@ function LuaTrade:toggle_range(idx, choice)
     end
     self.prev_list_idx = list_idx
 end
+
+
 function LuaTrade:toggle_group(choice, target_value, dry_run)
     if target_value == nil then
         local should_select = false
