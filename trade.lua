@@ -6,7 +6,7 @@
 -- index to modify is non-trivial.
 
 
-local version = 'v0.5.7-shiftclick'
+local version = 'v0.5'
 local common = reqscript('internal/caravan/common')
 local gui = require('gui')
 local overlay = require('plugins.overlay')
