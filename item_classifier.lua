@@ -57,6 +57,33 @@ local predicates = {
         local mat = dfhack.matinfo.decode(item)
         return mat and (mat.material.flags.BONE or mat.material.flags.SHELL)
     end,
+    material_is_gem = function(item)
+        local mat = dfhack.matinfo.decode(item)
+        return mat and mat.material and mat.material.flags.IS_GEM
+    end,
+
+    item_is_coal_bar = function(item)
+        return item:getType() == df.item_type.BAR and item:getMaterial() == df.builtin_mats.COAL
+    end,
+    item_is_metal_bar = function(item)
+        if item:getType() ~= df.item_type.BAR then return false end
+        if item:getMaterial() == df.builtin_mats.COAL then return false end
+        local mat = dfhack.matinfo.decode(item)
+        return mat and mat:isMetal()
+    end,
+    item_is_other_bar = function(item)
+        if item:getType() ~= df.item_type.BAR then return false end
+        local mat = dfhack.matinfo.decode(item)
+        return not (mat and mat:isMetal())
+    end,
+    item_is_rough_gem = function(item)
+        if item:getType() ~= df.item_type.ROUGH then return false end
+        local mat = dfhack.matinfo.decode(item)
+        return mat and mat.material and mat.material.flags.IS_GEM
+    end,
+    item_is_cut_gem = function(item)
+        return item:getType() == df.item_type.SMALLGEM
+    end,
 
     item_is_clothing = function(item)
         if not item:isArmor() then return false end
@@ -123,11 +150,12 @@ HIERARCHY = {
     },
     {
         id = "Tools & Equipment",
-        engine_types = {df.item_type.TOOL, df.item_type.FLASK, df.item_type.GOBLET, df.item_type.BUCKET, df.item_type.CHAIN, df.item_type.QUIVER},
+        engine_types = {df.item_type.TOOL, df.item_type.FLASK, df.item_type.GOBLET, df.item_type.BUCKET, df.item_type.CHAIN, df.item_type.QUIVER, df.item_type.SPLINT, df.item_type.CRUTCH},
         subclasses = {
             { id = "Liquid Containers", item_types = {df.item_type.FLASK, df.item_type.GOBLET, df.item_type.BUCKET} },
             { id = "Restraints", item_type = df.item_type.CHAIN },
             { id = "Quivers", item_type = df.item_type.QUIVER },
+            { id = "Medical", item_types = {df.item_type.SPLINT, df.item_type.CRUTCH} },
             { id = "General Tools", item_type = df.item_type.TOOL },
             { id = "Other", fallback = true }
         }
@@ -169,25 +197,34 @@ HIERARCHY = {
         }
     },
     {
+        id = "Gems",
+        engine_types = {df.item_type.SMALLGEM, df.item_type.ROUGH},
+        subclasses = {
+            { id = "Cut Gems", predicate = "item_is_cut_gem" },
+            { id = "Rough Gems", predicate = "item_is_rough_gem" },
+            { id = "Other", fallback = true }
+        }
+    },
+    {
         id = "Raw Materials",
         engine_types = {df.item_type.BAR, df.item_type.BLOCKS, df.item_type.BOULDER, df.item_type.WOOD, df.item_type.CLOTH, df.item_type.THREAD, df.item_type.LEATHER, df.item_type.SKIN_TANNED, df.item_type.GLOB, df.item_type.POWDER_MISC, df.item_type.LIQUID_MISC},
         subclasses = {
-            { id = "Metal Bars", item_type = df.item_type.BAR },
+            { id = "Metal Bars", predicate = "item_is_metal_bar" },
+            { id = "Other Bars", predicate = "item_is_other_bar" },
             { id = "Stone", item_types = {df.item_type.BLOCKS, df.item_type.BOULDER} },
             { id = "Wood", item_type = df.item_type.WOOD },
-            { id = "Textiles", item_types = {df.item_type.CLOTH, df.item_type.THREAD} },
-            { id = "Leather & Skins", item_types = {df.item_type.LEATHER, df.item_type.SKIN_TANNED} },
+            { id = "Textiles & Leather", item_types = {df.item_type.CLOTH, df.item_type.THREAD, df.item_type.LEATHER, df.item_type.SKIN_TANNED} },
             { id = "Powders & Liquids", item_types = {df.item_type.POWDER_MISC, df.item_type.LIQUID_MISC, df.item_type.GLOB} },
             { id = "Other", fallback = true }
         }
     },
     {
         id = "Food & Consumables",
-        engine_types = {df.item_type.FOOD, df.item_type.DRINK, df.item_type.PLANT, df.item_type.SEEDS, df.item_type.MEAT, df.item_type.FISH, df.item_type.FISH_RAW, df.item_type.CHEESE, df.item_type.EGG, df.item_type.HONEYCOMB},
+        engine_types = {df.item_type.FOOD, df.item_type.DRINK, df.item_type.PLANT, df.item_type.PLANT_GROWTH, df.item_type.SEEDS, df.item_type.MEAT, df.item_type.FISH, df.item_type.FISH_RAW, df.item_type.CHEESE, df.item_type.EGG, df.item_type.HONEYCOMB},
         subclasses = {
             { id = "Prepared Food", item_type = df.item_type.FOOD },
             { id = "Drinks", item_type = df.item_type.DRINK },
-            { id = "Plants", item_type = df.item_type.PLANT },
+            { id = "Plants", item_types = {df.item_type.PLANT, df.item_type.PLANT_GROWTH} },
             { id = "Meat & Fish", item_types = {df.item_type.MEAT, df.item_type.FISH, df.item_type.FISH_RAW} },
             { id = "Dairy & Eggs", item_types = {df.item_type.CHEESE, df.item_type.EGG} },
             { id = "Seeds", item_type = df.item_type.SEEDS },
