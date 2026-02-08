@@ -209,7 +209,7 @@ function LuaTrade:init()
                 widgets.Label{
                     view_id='click_guide',
                     frame={t=0},
-                    text='+-- SELECT ---+--- DRILL DOWN ---+',
+                    text='+-- SELECT ---+--- DRILL DOWN ----+',
                     text_pen=COLOR_LIGHTGREEN,
                 },
                 widgets.CycleHotkeyLabel{
@@ -858,9 +858,29 @@ function LuaTrade:toggle_item_base(choice, target_value, dry_run)
 end
 
 function LuaTrade:toggle_visible()
-    local target_value
-    for _, choice in ipairs(self.subviews.list:getVisibleChoices()) do
-        target_value = toggle_item_base(choice, target_value)
+    local all_items = {}
+    local function collect_items(choices)
+        for _, choice in ipairs(choices) do
+            if choice.data.is_group then
+                collect_items(choice.data.items)
+            else
+                table.insert(all_items, choice)
+            end
+        end
+    end
+
+    collect_items(self.subviews.list:getVisibleChoices())
+
+    local target_value = false
+    for _, item_choice in ipairs(all_items) do
+        if not trade.goodflag[item_choice.data.list_idx][item_choice.data.item_idx].selected then
+            target_value = true
+            break
+        end
+    end
+
+    for _, item_choice in ipairs(all_items) do
+        toggle_item_base(item_choice, target_value)
     end
 end
 
