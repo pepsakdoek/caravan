@@ -86,11 +86,17 @@ function sort_by_subclass_asc(a, b)
 end
 
 function sort_by_count_desc(a, b)
-    return sort_by_value_desc(a, b)
+    if a.data.quantity == b.data.quantity then
+        return sort_by_value_desc(a, b)
+    end
+    return (a.data.quantity or 0) > (b.data.quantity or 0)
 end
 
 function sort_by_count_asc(a, b)
-    return sort_by_value_asc(a, b)
+    if a.data.quantity == b.data.quantity then
+        return sort_by_value_asc(a, b)
+    end
+    return (a.data.quantity or 0) < (b.data.quantity or 0)
 end
 
 function sort_by_grouped_desc(a, b)
@@ -102,4 +108,3 @@ function sort_by_grouped_asc(a, b)
     if a.data.grouped == b.data.grouped then return sort_by_value_desc(a, b) end
     return a.data.grouped > b.data.grouped
 end
-
