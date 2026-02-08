@@ -65,21 +65,10 @@ local predicates = {
     item_is_coal_bar = function(item)
         return item:getType() == df.item_type.BAR and item:getMaterial() == df.builtin_mats.COAL
     end,
-    item_is_metal_bar = function(item)
-        if item:getType() ~= df.item_type.BAR then return false end
-        if item:getMaterial() == df.builtin_mats.COAL then return false end
-        local mat = dfhack.matinfo.decode(item)
-        return mat and mat:isMetal()
-    end,
-    item_is_other_bar = function(item)
-        if item:getType() ~= df.item_type.BAR then return false end
-        local mat = dfhack.matinfo.decode(item)
-        return not (mat and mat:isMetal())
-    end,
     item_is_rough_gem = function(item)
         if item:getType() ~= df.item_type.ROUGH then return false end
         local mat = dfhack.matinfo.decode(item)
-        return mat and mat.material and mat.material.flags.IS_GEM
+        return mat and mat.material and mat.material.`flags.IS_GEM
     end,
     item_is_cut_gem = function(item)
         return item:getType() == df.item_type.SMALLGEM
