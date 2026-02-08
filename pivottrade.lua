@@ -6,7 +6,7 @@
 -- index to modify is non-trivial.
 
 
-local version = 'v0.5'
+local version = 'v0.51'
 local common = reqscript('internal/caravan/common')
 local gui = require('gui')
 local overlay = require('plugins.overlay')
@@ -309,7 +309,7 @@ function LuaTrade:init()
         },
         widgets.Label{
             frame={b=2, l=0, r=0},
-            text='Click X/Cnt/Value to mark/unmark for trade. Click Class/Subclass/Grouped/Item Description to drill down.',
+            text='Click X/Cnt/Value to mark/unmark for trade. Click Class/Subclass/Grouped/Item Description to drill down. ENTER to drill down, SPACE to select.',
         },
         widgets.HotkeyLabel{
             frame={l=0, b=0},
