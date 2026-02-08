@@ -386,6 +386,11 @@ function LuaTrade:init()
                 return handled
             end
 
+            local modifiers = dfhack.internal.getModifiers()
+            if modifiers.shift then
+                return handled
+            end
+
             local idx = widget:getSelected()
             if not idx then return end
             local choices = self.subviews.list:getVisibleChoices()
@@ -865,12 +870,33 @@ function LuaTrade:toggle_range(idx, choice)
         return
     end
     local choices = self.subviews.list:getVisibleChoices()
-    local target_value
+    local function choice_is_fully_selected(current_choice)
+        if current_choice.data.is_group then
+            for _, item_choice in ipairs(current_choice.data.items) do
+                local goodflag = trade.goodflag[item_choice.data.list_idx][item_choice.data.item_idx]
+                if not goodflag.selected then return false end
+            end
+            return true
+        end
+        local goodflag = trade.goodflag[current_choice.data.list_idx][current_choice.data.item_idx]
+        return goodflag.selected
+    end
+
+    local all_selected = true
     for i = list_idx, self.prev_list_idx, list_idx < self.prev_list_idx and 1 or -1 do
         local current_choice = choices[i]
-        -- The first time through, target_value is nil, so it toggles the item and returns the new state.
-        -- For all subsequent items, it uses that returned state to set them.
-        target_value = self:toggle_item_base(current_choice, target_value)
+        if current_choice and not choice_is_fully_selected(current_choice) then
+            all_selected = false
+            break
+        end
+    end
+
+    local target_value = not all_selected
+    for i = list_idx, self.prev_list_idx, list_idx < self.prev_list_idx and 1 or -1 do
+        local current_choice = choices[i]
+        if current_choice then
+            self:toggle_item_base(current_choice, target_value)
+        end
     end
     self.prev_list_idx = list_idx
 end
