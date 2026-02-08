@@ -10,6 +10,25 @@ function get_entry_icon(data)
     end
 end
 
+function get_sort_level(sort_fn)
+    if sort_fn == sort_by_name_desc or sort_fn == sort_by_name_asc then
+        return 'name'
+    elseif sort_fn == sort_by_grouped_desc or sort_fn == sort_by_grouped_asc then
+        return 'grouped'
+    elseif sort_fn == sort_by_subclass_desc or sort_fn == sort_by_subclass_asc then
+        return 'subclass'
+    elseif sort_fn == sort_by_class_desc or sort_fn == sort_by_class_asc then
+        return 'class'
+    elseif sort_fn == sort_by_value_desc or sort_fn == sort_by_value_asc then
+        return 'value'
+    elseif sort_fn == sort_by_count_desc or sort_fn == sort_by_count_asc then
+        return 'count'
+    elseif sort_fn == sort_by_status_desc or sort_fn == sort_by_status_asc then
+        return 'status'
+    end
+    return 'unknown'
+end
+
 function sort_noop()
     -- this function is used as a marker and never actually gets called
     error('sort_noop should not be called')

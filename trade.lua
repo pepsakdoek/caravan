@@ -76,6 +76,7 @@ function LuaTrade:init()
     self:addviews{
         widgets.CycleHotkeyLabel{
             view_id='sort',
+            visible=false,
             frame={t=0, l=0, w=21},
             label='Sort by:',
             key='CUSTOM_SHIFT_S',
@@ -96,11 +97,11 @@ function LuaTrade:init()
                 {label='name'..common.CH_UP, value=sorting.sort_by_name_asc},
             },
             initial_option=sorting.sort_by_status_desc,
-            on_change=self:callback('refresh_list', 'sort'),
+            on_change=self:callback('on_sort_change'),
         },
         widgets.ToggleHotkeyLabel{
             view_id='trade_bins',
-            frame={t=0, l=26, w=36},
+            frame={t=0, l=0, w=36},
             label='Bins:',
             key='CUSTOM_SHIFT_B',
             options={
@@ -265,7 +266,8 @@ function LuaTrade:init()
                         {label='Subclass'..common.CH_DN, value=sorting.sort_by_subclass_desc},
                         {label='Subclass'..common.CH_UP, value=sorting.sort_by_subclass_asc},
                     },
-                    on_change=self:callback('refresh_list', 'sort_subclass'),
+                    on_change=self:callback('on_sort_change', 'sort_subclass'),
+                    enabled=function() return #self.path >= 1 end,
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_grouped',
@@ -275,7 +277,8 @@ function LuaTrade:init()
                         {label='Grouped'..common.CH_DN, value=sorting.sort_by_grouped_desc},
                         {label='Grouped'..common.CH_UP, value=sorting.sort_by_grouped_asc},
                     },
-                    on_change=self:callback('refresh_list', 'sort_grouped'),
+                    on_change=self:callback('on_sort_change', 'sort_grouped'),
+                    enabled=function() return #self.path >= 2 end,
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_name',
@@ -286,7 +289,8 @@ function LuaTrade:init()
                         {label='Item Description'..common.CH_UP, value=sorting.sort_by_name_asc},
                     },
                     option_gap=0,
-                    on_change=self:callback('refresh_list', 'sort_name'),
+                    on_change=self:callback('on_sort_change', 'sort_name'),
+                    enabled=function() return #self.path >= 3 end,
                 },
                 widgets.FilteredList{
                     view_id='list',
@@ -421,17 +425,56 @@ function LuaTrade:go_back()
     end
 end
 
+function LuaTrade:is_sort_fn_valid(sort_fn)
+    -- Allow cycling between asc/desc of the current sort level
+    local current_sort_fn = self.subviews.sort:getOptionValue()
+    if sorting.get_sort_level(sort_fn) == sorting.get_sort_level(current_sort_fn) then
+        return true
+    end
+
+    local path_len = #self.path
+    if path_len >= 3 then return true end -- All sorts are valid at item level
+
+    local sort_level = sorting.get_sort_level(sort_fn)
+
+    if sort_level == 'name' then return path_len >= 3 end
+    if sort_level == 'grouped' then return path_len >= 2 end
+    if sort_level == 'subclass' then return path_len >= 1 end
+    if sort_level == 'class' then return path_len >= 0 end
+
+    return true -- Status, Count, Value are always valid
+end
+
+function LuaTrade:on_sort_change(sort_widget_name, sort_fn)
+    sort_widget_name = sort_widget_name or 'sort'
+    local sort_widget = self.subviews[sort_widget_name]
+    sort_fn = sort_fn or sort_widget:getOptionValue()
+
+    if sort_fn == sorting.sort_noop then
+        sort_widget:cycle()
+        return
+    end
+
+    if not self:is_sort_fn_valid(sort_fn) then
+        if sort_widget_name ~= 'sort' then
+            sort_widget:cycle(-1) -- revert cycle
+            return
+        end
+        -- If we used the main sort hotkey, cycle until we find a valid one.
+        local initial_sort_fn = sort_fn
+        repeat
+            self.subviews.sort:cycle(1, true) -- cycle without triggering on_change
+            sort_fn = self.subviews.sort:getOptionValue()
+            -- break if we've looped all the way around to prevent infinite loops
+        until self:is_sort_fn_valid(sort_fn) or sort_fn == initial_sort_fn
+    end
+    self:refresh_list(sort_widget_name, sort_fn)
+end
+
 function LuaTrade:refresh_list(sort_widget, sort_fn)
     if self._refreshing then return end
     self._refreshing = true
-    sort_widget = sort_widget or 'sort'
-    sort_fn = sort_fn or self.subviews[sort_widget]:getOptionValue()
-
-    if sort_fn == sorting.sort_noop then
-        self.subviews[sort_widget]:cycle()
-        self._refreshing = false
-        return
-    end
+    sort_fn = sort_fn or self.subviews.sort:getOptionValue()
 
     -- Update ALL sort-related widgets to match the current active sort function
     local sort_widgets = {
