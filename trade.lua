@@ -5,6 +5,8 @@
 -- selection. the state is in trade.current_type_a_flag, but figuring out which
 -- index to modify is non-trivial.
 
+
+local version = 'v0.5.7-shiftclick'
 local common = reqscript('internal/caravan/common')
 local gui = require('gui')
 local overlay = require('plugins.overlay')
@@ -194,9 +196,15 @@ function LuaTrade:init()
             view_id='list_panel',
             frame={t=7, l=0, r=0, b=5},
             subviews={
+                widgets.Label{
+                    view_id='click_guide',
+                    frame={t=0},
+                    text='+-- SELECT ---+--- DRILL DOWN ---+',
+                    text_pen=COLOR_LIGHTGREEN,
+                },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_status',
-                    frame={t=0, l=0, w=STATUS_COL_WIDTH},
+                    frame={t=1, l=0, w=STATUS_COL_WIDTH},
                     options={
                         {label='X', value=sorting.sort_noop},
                         {label='X'..common.CH_DN, value=sorting.sort_by_status_desc},
@@ -208,7 +216,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_count',
-                    frame={t=0, l=STATUS_COL_WIDTH+1, w=COUNT_COL_WIDTH},
+                    frame={t=1, l=STATUS_COL_WIDTH+1, w=COUNT_COL_WIDTH},
                     options={
                         {label='Cnt', value=sorting.sort_noop},
                         {label='Cnt'..common.CH_DN, value=sorting.sort_by_count_desc},
@@ -219,7 +227,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_value',
-                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1, w=VALUE_COL_WIDTH},
+                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1, w=VALUE_COL_WIDTH},
                     options={
                         {label='Value', value=sorting.sort_noop},
                         {label='Value'..common.CH_DN, value=sorting.sort_by_value_desc},
@@ -230,7 +238,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_class',
-                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1, w=CLASS_COL_WIDTH},
+                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1, w=CLASS_COL_WIDTH},
                     options={
                         {label='Class', value=sorting.sort_noop},
                         {label='Class'..common.CH_DN, value=sorting.sort_by_class_desc},
@@ -241,7 +249,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_subclass',
-                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+CLASS_COL_WIDTH+1, w=SUBCLASS_COL_WIDTH},
+                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+CLASS_COL_WIDTH+1, w=SUBCLASS_COL_WIDTH},
                     options={
                         {label='Subclass', value=sorting.sort_noop},
                         {label='Subclass'..common.CH_DN, value=sorting.sort_by_subclass_desc},
@@ -251,7 +259,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_grouped',
-                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+1, w=GROUPED_COL_WIDTH},
+                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+1, w=GROUPED_COL_WIDTH},
                     options={
                         {label='Grouped', value=sorting.sort_noop},
                         {label='Grouped'..common.CH_DN, value=sorting.sort_by_grouped_desc},
@@ -261,7 +269,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_name',
-                    frame={t=0, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+2+GROUPED_COL_WIDTH+2, w=30},
+                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+2+GROUPED_COL_WIDTH+2, w=30},
                     options={
                         {label='Item Description', value=sorting.sort_noop},
                         {label='Item Description'..common.CH_DN, value=sorting.sort_by_name_desc},
@@ -303,6 +311,11 @@ function LuaTrade:init()
                 {text=function() return common.obfuscate_value(self:get_total_selected_value()) end, pen=COLOR_GREEN}
             },
         },
+        widgets.Label{
+            frame={r=1, b=0},
+            text=version,
+            auto_width=true,
+        },
     }
 
     self.subviews.list.list.frame.t = 0
@@ -315,6 +328,7 @@ function LuaTrade:init()
     list_widget.onInput = function(widget, keys)
         if keys.SELECT then
             local idx = widget:getSelected()
+            if not idx then return end
             local choices = self.subviews.list:getVisibleChoices()
             if choices and choices[idx] then
                 self:toggle_item(idx, choices[idx], false)
@@ -345,6 +359,7 @@ function LuaTrade:init()
             end
 
             local idx = widget:getSelected()
+            if not idx then return end
             local choices = self.subviews.list:getVisibleChoices()
             if choices and choices[idx] then
                 self:toggle_item(idx, choices[idx], true)
@@ -697,34 +712,39 @@ local function toggle_item_base(choice, target_value)
     return target_value
 end
 
-function LuaTrade:toggle_group(choice)
-    local target = true
-    for _, item_choice in ipairs(choice.data.items) do
-        local goodflag = trade.goodflag[item_choice.data.list_idx][item_choice.data.item_idx]
-        if not goodflag.selected then
-            target = true
-            goto found
-        end
-    end
-    target = false
-    ::found::
-    
-    for _, item_choice in ipairs(choice.data.items) do
-        toggle_item_base(item_choice, target)
-    end
-end
-
 function LuaTrade:select_item(idx, choice)
     if not dfhack.internal.getModifiers().shift then
         self.prev_list_idx = self.subviews.list.list:getSelected()
     end
 end
 
+function LuaTrade:toggle_group(choice, target_value)
+    if target_value == nil then
+        local target = true
+        for _, item_choice in ipairs(choice.data.items) do
+            local goodflag = trade.goodflag[item_choice.data.list_idx][item_choice.data.item_idx]
+            if not goodflag.selected then
+                target = true
+                goto found
+            end
+        end
+        target = false
+        ::found::
+        target_value = target
+    end
+    
+    for _, item_choice in ipairs(choice.data.items) do
+        toggle_item_base(item_choice, target_value)
+    end
+end
+
 function LuaTrade:toggle_item(idx, choice, is_click)
+    local modifiers = dfhack.internal.getModifiers()
     local list_widget = self.subviews.list.list
-    local selection_width = STATUS_COL_WIDTH + COUNT_COL_WIDTH + VALUE_COL_WIDTH + 1
+    local selection_width = STATUS_COL_WIDTH + 1 + COUNT_COL_WIDTH + 1 + VALUE_COL_WIDTH + 1
     
     if choice.data.is_group then
+        -- if ctrl is pressed, toggle the group regardless of click position
         local drill_down = true
         if is_click then
             local x, y = list_widget:getMousePos()
@@ -733,7 +753,10 @@ function LuaTrade:toggle_item(idx, choice, is_click)
             end
         end
         
-        if not drill_down then
+        local drill_down_start = selection_width + 2
+        if x and x < drill_down_start then
+            -- in the dead zone, do nothing
+        elseif not drill_down or modifiers.ctrl then
              self:toggle_group(choice)
         else
             table.insert(self.path, choice.data.desc)
@@ -746,17 +769,58 @@ function LuaTrade:toggle_item(idx, choice, is_click)
 end
 
 function LuaTrade:toggle_range(idx, choice)
-    if not self.prev_list_idx then
-        self:toggle_item(idx, choice)
+    local list_idx = self.subviews.list.list:getSelected()
+    if not self.prev_list_idx or self.prev_list_idx == list_idx then
+        self:toggle_item_base(choice)
+        self.prev_list_idx = list_idx
         return
     end
     local choices = self.subviews.list:getVisibleChoices()
-    local list_idx = self.subviews.list.list:getSelected()
     local target_value
     for i = list_idx, self.prev_list_idx, list_idx < self.prev_list_idx and 1 or -1 do
-        target_value = toggle_item_base(choices[i], target_value)
+        local current_choice = choices[i]
+        -- The first time through, target_value is nil, so it toggles the item and returns the new state.
+        -- For all subsequent items, it uses that returned state to set them.
+        target_value = self:toggle_item_base(current_choice, target_value)
     end
     self.prev_list_idx = list_idx
+end
+function LuaTrade:toggle_group(choice, target_value, dry_run)
+    if target_value == nil then
+        local should_select = false
+        for _, item_choice in ipairs(choice.data.items) do
+            local goodflag = trade.goodflag[item_choice.data.list_idx][item_choice.data.item_idx]
+            if not goodflag.selected then
+                should_select = true
+                break
+            end
+        end
+        target_value = should_select
+    end
+
+    if dry_run then return target_value end
+
+    for _, item_choice in ipairs(choice.data.items) do
+        toggle_item_base(item_choice, target_value)
+    end
+end
+
+function LuaTrade:toggle_item_base(choice, target_value, dry_run)
+    if choice.data.is_group then
+        return self:toggle_group(choice, target_value, dry_run)
+    else
+        local goodflag = trade.goodflag[choice.data.list_idx][choice.data.item_idx]
+        if target_value == nil then
+            target_value = not goodflag.selected
+        end
+        if dry_run then return target_value end
+        local prev_value = goodflag.selected
+        goodflag.selected = target_value
+        if choice.data.update_container_fn then
+            choice.data.update_container_fn(prev_value, target_value)
+        end
+        return target_value
+    end
 end
 
 function LuaTrade:toggle_visible()
