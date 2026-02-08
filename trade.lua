@@ -137,10 +137,20 @@ function LuaTrade:init()
             initial_option=false,
             on_change=function() self:updateLayout() end,
         },
-        widgets.EditField{
+        widgets.HotkeyLabel{
             view_id='search',
             frame={t=5, l=40},
-            label_text='Search: ',
+            label='Search:',
+            key='CUSTOM_ALT_S',
+            on_activate=function() self:activate_search() end,
+            auto_width=true,
+        },
+        widgets.EditField{
+            view_id='search_edit',
+            frame={t=5, l=55},
+            label_text='',
+            visible=false,
+            enabled=false,
             on_char=function(ch) return ch:match('[%l -]') end,
         },
         widgets.Panel{
@@ -319,10 +329,10 @@ function LuaTrade:init()
     }
 
     self.subviews.list.list.frame.t = 0
-    self.subviews.list.edit.visible = false
-    self.subviews.list.edit = self.subviews.search
-    self.subviews.search.on_change = self.subviews.list:callback('onFilterChange')
+    self.subviews.list.edit = self.subviews.search_edit
+    self.subviews.search_edit.on_change = self.subviews.list:callback('onFilterChange')
 
+    self.search_active = false
     local list_widget = self.subviews.list.list
     local orig_onInput = list_widget.onInput
     list_widget.onInput = function(widget, keys)
@@ -335,7 +345,11 @@ function LuaTrade:init()
                 return true
             end
         end
-        
+
+        if not self.search_active and keys.STRING_A00 then
+            return false
+        end
+
         local was_click = keys._MOUSE_L
         local handled = orig_onInput(widget, keys)
         if was_click and handled then
@@ -369,6 +383,26 @@ function LuaTrade:init()
     end
 
     self:reset_cache()
+end
+
+function LuaTrade:activate_search()
+    self.search_active = true
+    self.subviews.search_edit.visible = true
+    self.subviews.search_edit.enabled = true
+    self.subviews.search_edit:setFocus(true)
+end
+
+function LuaTrade:deactivate_search()
+    self.search_active = false
+    self:setFocus(true)
+end
+
+function LuaTrade:onInput(keys)
+    if self.search_active and (keys.LEAVESCREEN or keys.CUSTOM_ESC) then
+        self:deactivate_search()
+        return true
+    end
+    return LuaTrade.super.onInput(self, keys)
 end
 
 function LuaTrade:onBack()
