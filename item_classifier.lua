@@ -68,7 +68,7 @@ local predicates = {
     item_is_rough_gem = function(item)
         if item:getType() ~= df.item_type.ROUGH then return false end
         local mat = dfhack.matinfo.decode(item)
-        return mat and mat.material and mat.material.`flags.IS_GEM
+        return mat and mat.material and mat.material.flags.IS_GEM
     end,
     item_is_cut_gem = function(item)
         return item:getType() == df.item_type.SMALLGEM
