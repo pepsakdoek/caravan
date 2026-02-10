@@ -164,11 +164,11 @@ function LuaTrade:init()
         },
         widgets.EditField{
             view_id='search_edit',
-            frame={t=5, l=55},
+            frame={t=5, l=55, r=1},
             label_text='',
             visible=false,
             enabled=false,
-            on_char=function(ch) return ch:match('[%l -]') end,
+            on_char=function(ch) return ch:match('[%l%u%d %-%_\'\"]') end,
         },
         widgets.Panel{
             frame={t=7, l=0, r=0, h=FILTER_HEIGHT},
@@ -226,7 +226,7 @@ function LuaTrade:init()
                 widgets.Label{
                     view_id='click_guide',
                     frame={t=0},
-                    text='+-- SELECT ---+--- DRILL DOWN ----+',
+                    text='+-- SELECT ---+---- DRILL DOWN ----+',
                     text_pen=COLOR_LIGHTGREEN,
                 },
                 widgets.CycleHotkeyLabel{
@@ -276,7 +276,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_subclass',
-                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+class_col_width+1, w=subclass_col_width},
+                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+class_col_width, w=subclass_col_width},
                     options={
                         {label='Subclass', value=sorting.sort_noop},
                         {label='Subclass'..common.CH_DN, value=sorting.sort_by_subclass_desc},
@@ -350,12 +350,8 @@ function LuaTrade:init()
 
     self.subviews.list.list.frame.t = 0
     self.subviews.list.edit = self.subviews.search_edit
-    self.subviews.search_edit.on_change = function()
-        self.subviews.list:onFilterChange()
-        if self.subviews.auto_resize_cols:getOptionValue() then
-            self:refresh_list()
-        end
-    end
+    self.subviews.search_edit.on_change = self.subviews.list:callback('onFilterChange')
+
 
     self.search_active = false
     local list_widget = self.subviews.list.list
@@ -430,17 +426,32 @@ function LuaTrade:activate_search()
     self.subviews.search_edit.visible = true
     self.subviews.search_edit.enabled = true
     self.subviews.search_edit:setFocus(true)
+    return true
 end
 
 function LuaTrade:deactivate_search()
     self.search_active = false
+    self.subviews.search_edit:setFocus(false)
     self:setFocus(true)
 end
 
 function LuaTrade:onInput(keys)
-    if self.search_active and (keys.LEAVESCREEN or keys.CUSTOM_ESC) then
-        self:deactivate_search()
-        return true
+    if self.search_active then
+        if keys.LEAVESCREEN or keys.CUSTOM_ESC or keys.CUSTOM_ALT_S then
+            self:deactivate_search()
+            return true
+        end
+        if self.subviews.search_edit:onInput(keys) then
+            return true
+        end
+        if keys._STRING or keys.STRING_A00 or keys.BACKSPACE or keys.SELECT or
+            keys.CURSOR_LEFT or keys.CURSOR_RIGHT or keys.CURSOR_UP or keys.CURSOR_DOWN
+        then
+            return true
+        end
+    end
+    if keys.CUSTOM_ALT_S then
+        return self:activate_search()
     end
     return LuaTrade.super.onInput(self, keys)
 end
@@ -549,6 +560,10 @@ function LuaTrade:refresh_list(sort_widget, sort_fn)
         list:setChoices(choices, list:getSelected())
         list:setFilter(saved_filter)
         list.list:on_scrollbar(math.max(0, saved_top - list.list.page_top))
+    end
+
+    if self.search_active then
+        self.subviews.search_edit:setFocus(true)
     end
     self._refreshing = false
 end
@@ -1027,7 +1042,9 @@ function LuaTrade:update_column_layout()
     self.subviews.sort_subclass.frame.l = subclass_l
     self.subviews.sort_grouped.frame.l = grouped_l
     self.subviews.sort_name.frame.l = name_l
-    self:updateLayout()
+    if self.parent then
+        self:updateLayout()
+    end
 end
 
 function LuaTrade:set_column_widths(class_w, subclass_w, grouped_w)
@@ -1066,6 +1083,15 @@ function LuaTrade:update_choice_texts(choices)
         local desc = d.is_group and '' or (d.desc or '')
         local count = d.count or d.quantity or 1
         choice.text = make_choice_text(d.value or 0, count, desc, d.class or '', d.subclass or '', d.grouped or '')
+    end
+end
+
+function LuaTrade:resize_columns_for_visible_list()
+    local list = self.subviews.list
+    local visible = list:getVisibleChoices() or {}
+    local class_w, subclass_w, grouped_w = self:compute_column_widths(visible)
+    if self:set_column_widths(class_w, subclass_w, grouped_w) then
+        self:update_choice_texts(visible)
     end
 end
 
