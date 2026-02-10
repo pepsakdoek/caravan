@@ -1,21 +1,43 @@
 --@ module = true
 local M = {}
 
--- TODO:
--- Coal is counted as metal bars
--- Gems are sorted under Miscellaneous
--- Toys are sorted under Miscellaneous
--- Lots of foods are marked as Misc
---   berries, capers, leaves 
--- Splints & crutches are misc (could be medical? new def)
--- Parchment are misc
--- Items in containers I think are all other
--- Cloth and thread and (maybe) leather are raw materials and I think it should fall under 1 grouped one
 
 
 --------------------------------------------------------------------------
 -- PART 1: ITEM CLASSIFIER LOGIC
 ---------------------------------------------------------------------------
+local function add_subtype_id(map, id)
+    if id ~= nil then map[id] = true end
+end
+
+local writing_tool_subtypes = {}
+add_subtype_id(writing_tool_subtypes, dfhack.items.findSubtype('TOOL:ITEM_TOOL_SCROLL'))
+add_subtype_id(writing_tool_subtypes, dfhack.items.findSubtype('TOOL:ITEM_TOOL_SCROLL_ROLLERS'))
+add_subtype_id(writing_tool_subtypes, dfhack.items.findSubtype('TOOL:ITEM_TOOL_QUIRE'))
+
+local instrument_tool_uses = {
+    'INSTRUMENT',
+    'INSTRUMENT_PIECE',
+    'MUSICAL_INSTRUMENT',
+    'PLAY_INSTRUMENT',
+    'PLAY_MUSIC',
+}
+
+local function tool_def_text(def)
+    if not def then return nil end
+    return def.id or def.subtype_name or def.name or def.name_plural
+end
+
+local function is_rough_gem(item)
+    if df.item_roughst and df.item_roughst:is_instance(item) then
+        local mat = dfhack.matinfo.decode(item)
+        return mat and mat.material and mat.material.flags.IS_GEM and not mat.material.flags.IS_GLASS
+    end
+    if item:getType() ~= df.item_type.ROUGH then return false end
+    local mat = dfhack.matinfo.decode(item)
+    return mat and mat.material and mat.material.flags.IS_GEM and not mat.material.flags.IS_GLASS
+end
+
 local predicates = {
     weapon_skill_sword = function(item)
         local def = dfhack.items.getSubtypeDef(item:getType(), item:getSubtype())
@@ -50,7 +72,10 @@ local predicates = {
     material_is_metal = function(item) local mat = dfhack.matinfo.decode(item) return mat and mat:isMetal() end,
     material_is_stone = function(item) local mat = dfhack.matinfo.decode(item) return mat and mat:isStone() end,
     material_is_wood = function(item) local mat = dfhack.matinfo.decode(item) return mat and mat:isWood() end,
-    material_is_glass = function(item) local mat = dfhack.matinfo.decode(item) return mat and mat:isGlass() end,
+    material_is_glass = function(item)
+        local mat = dfhack.matinfo.decode(item)
+        return mat and mat.material and mat.material.flags.IS_GLASS
+    end,
     material_is_leather = function(item) local mat = dfhack.matinfo.decode(item) return mat and mat:isLeather() end,
     material_is_cloth = function(item) local mat = dfhack.matinfo.decode(item) return mat and mat:isCloth() end,
     material_is_bone_or_shell = function(item) 
@@ -62,16 +87,50 @@ local predicates = {
         return mat and mat.material and mat.material.flags.IS_GEM
     end,
 
+    item_is_metal_bar = function(item)
+        if item:getType() ~= df.item_type.BAR then return false end
+        local mat = dfhack.matinfo.decode(item)
+        return mat and mat.material and mat.material.flags.IS_METAL
+    end,
+    item_is_other_bar = function(item)
+        if item:getType() ~= df.item_type.BAR then return false end
+        local mat = dfhack.matinfo.decode(item)
+        return not (mat and mat.material and mat.material.flags.IS_METAL)
+    end,
     item_is_coal_bar = function(item)
         return item:getType() == df.item_type.BAR and item:getMaterial() == df.builtin_mats.COAL
     end,
-    item_is_rough_gem = function(item)
+    item_is_rough_gem = is_rough_gem,
+    item_is_cut_gem = function(item)
+        return (df.item_smallgemst and df.item_smallgemst:is_instance(item)) or
+            item:getType() == df.item_type.SMALLGEM
+    end,
+    item_is_large_gem = function(item)
+        return (df.item_gemst and df.item_gemst:is_instance(item)) or
+            item:getType() == df.item_type.LARGE_GEM
+    end,
+    item_is_rough_glass = function(item)
+        if df.item_roughst and df.item_roughst:is_instance(item) then
+            local mat = dfhack.matinfo.decode(item)
+            return mat and mat.material and mat.material.flags.IS_GLASS
+        end
         if item:getType() ~= df.item_type.ROUGH then return false end
         local mat = dfhack.matinfo.decode(item)
-        return mat and mat.material and mat.material.flags.IS_GEM
+        return mat and mat.material and mat.material.flags.IS_GLASS
     end,
-    item_is_cut_gem = function(item)
-        return item:getType() == df.item_type.SMALLGEM
+    item_is_sheet = function(item)
+        return (df.item_sheetst and df.item_sheetst:is_instance(item)) or
+            item:getType() == df.item_type.SHEET
+    end,
+    item_is_gem_item = function(item)
+        if df.item_gemst and df.item_gemst:is_instance(item) then return true end
+        if df.item_smallgemst and df.item_smallgemst:is_instance(item) then return true end
+        return is_rough_gem(item)
+    end,
+    item_is_textile_or_leather = function(item)
+        local t = item:getType()
+        return t == df.item_type.CLOTH or t == df.item_type.THREAD or
+            t == df.item_type.LEATHER or t == df.item_type.SKIN_TANNED
     end,
 
     item_is_clothing = function(item)
@@ -83,6 +142,29 @@ local predicates = {
     item_is_artifact = function(item) return item.flags.artifact end,
     item_is_forbidden = function(item) return item.flags.forbidden end,
     item_has_improvements = function(item) return #item.improvements > 0 end,
+    item_is_writing_tool = function(item)
+        if item:getType() ~= df.item_type.TOOL then return false end
+        if df.item_toolst:is_instance(item) and item:hasToolUse(df.tool_uses.CONTAIN_WRITING) then
+            return true
+        end
+        return writing_tool_subtypes[item:getSubtype()] == true
+    end,
+    item_is_instrument_tool = function(item)
+        if item:getType() ~= df.item_type.TOOL then return false end
+        if df.item_toolst:is_instance(item) then
+            for _, name in ipairs(instrument_tool_uses) do
+                local tool_use = df.tool_uses[name]
+                if tool_use and item:hasToolUse(tool_use) then
+                    return true
+                end
+            end
+        end
+        local def = dfhack.items.getSubtypeDef(item:getType(), item:getSubtype())
+        local text = tool_def_text(def)
+        if not text then return false end
+        text = text:lower()
+        return text:find('instrument', 1, true) ~= nil or text:find('music', 1, true) ~= nil
+    end,
 }
 
 -- The Hierarchy Definition
@@ -91,13 +173,7 @@ HIERARCHY = {
         id = "Weapons",
         engine_types = {df.item_type.WEAPON},
         subclasses = {
-            { id = "Swords", predicate = "weapon_skill_sword" },
-            { id = "Axes", predicate = "weapon_skill_axe" },
-            { id = "Polearms", predicate = "weapon_skill_polearm" },
-            { id = "Blunt", predicate = "weapon_skill_blunt" },
-            { id = "Daggers", predicate = "weapon_skill_dagger" },
-            { id = "Ranged", predicate = "weapon_skill_ranged" },
-            { id = "Thrown", predicate = "weapon_skill_throwing" },
+            { id = "Weapons", item_type = df.item_type.WEAPON },
             { id = "Other", fallback = true }
         }
     },
@@ -116,15 +192,16 @@ HIERARCHY = {
         }
     },
     {
-        id = "Clothing",
-        engine_types = {df.item_type.ARMOR, df.item_type.HELM, df.item_type.PANTS, df.item_type.GLOVES, df.item_type.SHOES},
-        require = function(item) return predicates.item_is_clothing(item) end,
+        id = "Clothing & Textiles",
+        engine_types = {df.item_type.ARMOR, df.item_type.HELM, df.item_type.PANTS, df.item_type.GLOVES, df.item_type.SHOES, df.item_type.CLOTH, df.item_type.THREAD, df.item_type.LEATHER, df.item_type.SKIN_TANNED},
+        require = function(item) return predicates.item_is_clothing(item) or predicates.item_is_textile_or_leather(item) end,
         subclasses = {
             { id = "Body", item_type = df.item_type.ARMOR },
             { id = "Headwear", item_type = df.item_type.HELM },
             { id = "Legwear", item_type = df.item_type.PANTS },
             { id = "Handwear", item_type = df.item_type.GLOVES },
             { id = "Footwear", item_type = df.item_type.SHOES },
+            { id = "Textiles & Leather", predicate = "item_is_textile_or_leather" },
             { id = "Other", fallback = true }
         }
     },
@@ -138,13 +215,41 @@ HIERARCHY = {
         }
     },
     {
+        id = "Books & Writing",
+        engine_types = {df.item_type.BOOK, df.item_type.SCROLL, df.item_type.SHEET, df.item_type.TOOL},
+        match_predicate = "item_is_sheet",
+        require = function(item)
+            return item:getType() ~= df.item_type.TOOL or predicates.item_is_writing_tool(item)
+        end,
+        subclasses = {
+            { id = "Books", item_type = df.item_type.BOOK },
+            { id = "Scrolls", item_type = df.item_type.SCROLL },
+            { id = "Sheets", predicate = "item_is_sheet" },
+            { id = "Writing Tools", predicate = "item_is_writing_tool" },
+            { id = "Other", fallback = true }
+        }
+    },
+    {
+        id = "Instruments & Parts",
+        engine_types = {df.item_type.INSTRUMENT, df.item_type.TOOL},
+        require = function(item)
+            return item:getType() == df.item_type.INSTRUMENT or predicates.item_is_instrument_tool(item)
+        end,
+        subclasses = {
+            { id = "Instruments", item_type = df.item_type.INSTRUMENT },
+            { id = "Parts", predicate = "item_is_instrument_tool" },
+            { id = "Other", fallback = true }
+        }
+    },
+    {
         id = "Tools & Equipment",
-        engine_types = {df.item_type.TOOL, df.item_type.FLASK, df.item_type.GOBLET, df.item_type.BUCKET, df.item_type.CHAIN, df.item_type.QUIVER, df.item_type.SPLINT, df.item_type.CRUTCH},
+        engine_types = {df.item_type.TOOL, df.item_type.FLASK, df.item_type.GOBLET, df.item_type.BUCKET, df.item_type.CHAIN, df.item_type.QUIVER, df.item_type.BACKPACK, df.item_type.SPLINT, df.item_type.CRUTCH, df.item_type.ANVIL},
         subclasses = {
             { id = "Liquid Containers", item_types = {df.item_type.FLASK, df.item_type.GOBLET, df.item_type.BUCKET} },
             { id = "Restraints", item_type = df.item_type.CHAIN },
-            { id = "Quivers", item_type = df.item_type.QUIVER },
+            { id = "Backpacks & Quivers", item_types = {df.item_type.BACKPACK, df.item_type.QUIVER} },
             { id = "Medical", item_types = {df.item_type.SPLINT, df.item_type.CRUTCH} },
+            { id = "Anvils", item_type = df.item_type.ANVIL },
             { id = "General Tools", item_type = df.item_type.TOOL },
             { id = "Other", fallback = true }
         }
@@ -176,33 +281,42 @@ HIERARCHY = {
     },
     {
         id = "Finished Goods",
-        engine_types = {df.item_type.CRAFTS, df.item_type.TOY, df.item_type.INSTRUMENT, df.item_type.BOOK, df.item_type.SCROLL, df.item_type.SHEET},
+        engine_types = {df.item_type.CRAFTS},
         subclasses = {
             { id = "Crafts", item_type = df.item_type.CRAFTS },
+            { id = "Other", fallback = true }
+        }
+    },
+    {
+        id = "Toys",
+        engine_types = {df.item_type.TOY},
+        subclasses = {
             { id = "Toys", item_type = df.item_type.TOY },
-            { id = "Instruments", item_type = df.item_type.INSTRUMENT },
-            { id = "Books & Writing", item_types = {df.item_type.BOOK, df.item_type.SCROLL, df.item_type.SHEET} },
             { id = "Other", fallback = true }
         }
     },
     {
         id = "Gems",
-        engine_types = {df.item_type.SMALLGEM, df.item_type.ROUGH},
+        engine_types = {df.item_type.SMALLGEM, df.item_type.ROUGH, df.item_type.LARGE_GEM},
+        match_predicate = "item_is_gem_item",
+        require = function(item) return not predicates.item_is_rough_glass(item) end,
         subclasses = {
             { id = "Cut Gems", predicate = "item_is_cut_gem" },
             { id = "Rough Gems", predicate = "item_is_rough_gem" },
+            { id = "Large Gems", predicate = "item_is_large_gem" },
             { id = "Other", fallback = true }
         }
     },
     {
         id = "Raw Materials",
-        engine_types = {df.item_type.BAR, df.item_type.BLOCKS, df.item_type.BOULDER, df.item_type.WOOD, df.item_type.CLOTH, df.item_type.THREAD, df.item_type.LEATHER, df.item_type.SKIN_TANNED, df.item_type.GLOB, df.item_type.POWDER_MISC, df.item_type.LIQUID_MISC},
+        engine_types = {df.item_type.BAR, df.item_type.BLOCKS, df.item_type.BOULDER, df.item_type.WOOD, df.item_type.CLOTH, df.item_type.THREAD, df.item_type.LEATHER, df.item_type.SKIN_TANNED, df.item_type.ROUGH, df.item_type.GLOB, df.item_type.POWDER_MISC, df.item_type.LIQUID_MISC},
+        match_predicate = "item_is_rough_glass",
         subclasses = {
             { id = "Metal Bars", predicate = "item_is_metal_bar" },
             { id = "Other Bars", predicate = "item_is_other_bar" },
             { id = "Stone", item_types = {df.item_type.BLOCKS, df.item_type.BOULDER} },
             { id = "Wood", item_type = df.item_type.WOOD },
-            { id = "Textiles & Leather", item_types = {df.item_type.CLOTH, df.item_type.THREAD, df.item_type.LEATHER, df.item_type.SKIN_TANNED} },
+            { id = "Glass", predicate = "item_is_rough_glass" },
             { id = "Powders & Liquids", item_types = {df.item_type.POWDER_MISC, df.item_type.LIQUID_MISC, df.item_type.GLOB} },
             { id = "Other", fallback = true }
         }
@@ -251,6 +365,12 @@ function classify_item(item)
                     match_class = true
                     break
                 end
+            end
+        end
+
+        if not match_class and class.match_predicate and predicates[class.match_predicate] then
+            if predicates[class.match_predicate](item) then
+                match_class = true
             end
         end
         
