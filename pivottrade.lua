@@ -37,9 +37,13 @@ local STATUS_COL_WIDTH = 2
 local COUNT_COL_WIDTH = 4
 local VALUE_COL_WIDTH = 6
 local FILTER_HEIGHT = 18
-local CLASS_COL_WIDTH = 18
-local SUBCLASS_COL_WIDTH = 15
-local GROUPED_COL_WIDTH = 25
+local DEFAULT_CLASS_COL_WIDTH = 18
+local DEFAULT_SUBCLASS_COL_WIDTH = 15
+local DEFAULT_GROUPED_COL_WIDTH = 25
+
+local class_col_width = DEFAULT_CLASS_COL_WIDTH
+local subclass_col_width = DEFAULT_SUBCLASS_COL_WIDTH
+local grouped_col_width = DEFAULT_GROUPED_COL_WIDTH
 
 local function get_generic_description(item)
     local desc = dfhack.items.getReadableDescription(item)
@@ -137,6 +141,18 @@ function LuaTrade:init()
             },
             initial_option=false,
             on_change=function() self:updateLayout() end,
+        },
+        widgets.ToggleHotkeyLabel{
+            view_id='auto_resize_cols',
+            frame={t=0, l=40, w=40},
+            label='Auto columns widths:',
+            key='CUSTOM_SHIFT_R',
+            options={
+                {label='Yes', value=true, pen=COLOR_GREEN},
+                {label='No', value=false}
+            },
+            initial_option=true,
+            on_change=function() self:refresh_list() end,
         },
         widgets.HotkeyLabel{
             view_id='search',
@@ -249,7 +265,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_class',
-                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1, w=CLASS_COL_WIDTH},
+                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1, w=class_col_width},
                     options={
                         {label='Class', value=sorting.sort_noop},
                         {label='Class'..common.CH_DN, value=sorting.sort_by_class_desc},
@@ -260,7 +276,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_subclass',
-                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+CLASS_COL_WIDTH+1, w=SUBCLASS_COL_WIDTH},
+                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+class_col_width+1, w=subclass_col_width},
                     options={
                         {label='Subclass', value=sorting.sort_noop},
                         {label='Subclass'..common.CH_DN, value=sorting.sort_by_subclass_desc},
@@ -271,7 +287,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_grouped',
-                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+1, w=GROUPED_COL_WIDTH},
+                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+class_col_width+2+subclass_col_width+1, w=grouped_col_width},
                     options={
                         {label='Grouped', value=sorting.sort_noop},
                         {label='Grouped'..common.CH_DN, value=sorting.sort_by_grouped_desc},
@@ -282,7 +298,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_name',
-                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+CLASS_COL_WIDTH+2+SUBCLASS_COL_WIDTH+2+GROUPED_COL_WIDTH+2, w=30},
+                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+class_col_width+2+subclass_col_width+2+grouped_col_width+2, w=30},
                     options={
                         {label='Item Description', value=sorting.sort_noop},
                         {label='Item Description'..common.CH_DN, value=sorting.sort_by_name_desc},
@@ -334,7 +350,12 @@ function LuaTrade:init()
 
     self.subviews.list.list.frame.t = 0
     self.subviews.list.edit = self.subviews.search_edit
-    self.subviews.search_edit.on_change = self.subviews.list:callback('onFilterChange')
+    self.subviews.search_edit.on_change = function()
+        self.subviews.list:onFilterChange()
+        if self.subviews.auto_resize_cols:getOptionValue() then
+            self:refresh_list()
+        end
+    end
 
     self.search_active = false
     local list_widget = self.subviews.list.list
@@ -506,10 +527,29 @@ function LuaTrade:refresh_list(sort_widget, sort_fn)
     local list = self.subviews.list
     local saved_filter = list:getFilter()
     local saved_top = list.list.page_top
+    local choices = self:get_choices()
+
     list:setFilter('')
-    list:setChoices(self:get_choices(), list:getSelected())
+    list:setChoices(choices, list:getSelected())
     list:setFilter(saved_filter)
     list.list:on_scrollbar(math.max(0, saved_top - list.list.page_top))
+
+    local auto_resize = self.subviews.auto_resize_cols:getOptionValue()
+    local class_w, subclass_w, grouped_w
+    if auto_resize then
+        local visible = list:getVisibleChoices() or {}
+        class_w, subclass_w, grouped_w = self:compute_column_widths(visible)
+    else
+        class_w, subclass_w, grouped_w = DEFAULT_CLASS_COL_WIDTH, DEFAULT_SUBCLASS_COL_WIDTH, DEFAULT_GROUPED_COL_WIDTH
+    end
+
+    if self:set_column_widths(class_w, subclass_w, grouped_w) then
+        self:update_choice_texts(choices)
+        list:setFilter('')
+        list:setChoices(choices, list:getSelected())
+        list:setFilter(saved_filter)
+        list.list:on_scrollbar(math.max(0, saved_top - list.list.page_top))
+    end
     self._refreshing = false
 end
 
@@ -533,9 +573,9 @@ local function make_choice_text(value, count, desc, class, subclass, grouped)
         {width=STATUS_COL_WIDTH-3, text=''},
         {gap=1, width=COUNT_COL_WIDTH, rjustify=true, text=count},
         {gap=1, width=VALUE_COL_WIDTH, rjustify=true, text=common.obfuscate_value(value)},
-        {gap=2, width=CLASS_COL_WIDTH, text=class, pen=COLOR_CYAN},     -- Added width
-        {gap=2, width=SUBCLASS_COL_WIDTH, text=subclass, pen=COLOR_GREY}, -- Added width
-        {gap=2, width=GROUPED_COL_WIDTH, text=grouped},
+        {gap=2, width=class_col_width, text=class, pen=COLOR_CYAN},     -- Added width
+        {gap=2, width=subclass_col_width, text=subclass, pen=COLOR_GREY}, -- Added width
+        {gap=2, width=grouped_col_width, text=grouped},
         {gap=2, text=desc},
     } 
 end
@@ -764,7 +804,7 @@ function LuaTrade:aggregate_choices(flat_choices)
             if sel > 0 then return common.SOME_PEN end
             return nil
         end
-        choice.text = make_choice_text(g.value, g.count, g.desc, g.class, g.subclass, g.grouped)
+        choice.text = make_choice_text(g.value, g.count, '', g.class, g.subclass, g.grouped)
         table.insert(choices, choice)
     end
     
@@ -970,6 +1010,63 @@ end
 function LuaTrade:reset_cache()
     self.choices = {[0]={}, [1]={}}
     self:refresh_list()
+end
+
+function LuaTrade:update_column_layout()
+    local base = STATUS_COL_WIDTH + 1 + COUNT_COL_WIDTH + 1 + VALUE_COL_WIDTH + 1
+    local class_l = base
+    local subclass_l = base + class_col_width + 1
+    local grouped_l = base + class_col_width + 2 + subclass_col_width + 1
+    local name_l = base + class_col_width + 2 + subclass_col_width + 2 + grouped_col_width + 2
+
+    self.subviews.sort_class.frame.w = class_col_width
+    self.subviews.sort_subclass.frame.w = subclass_col_width
+    self.subviews.sort_grouped.frame.w = grouped_col_width
+
+    self.subviews.sort_class.frame.l = class_l
+    self.subviews.sort_subclass.frame.l = subclass_l
+    self.subviews.sort_grouped.frame.l = grouped_l
+    self.subviews.sort_name.frame.l = name_l
+    self:updateLayout()
+end
+
+function LuaTrade:set_column_widths(class_w, subclass_w, grouped_w)
+    class_w = math.max(DEFAULT_CLASS_COL_WIDTH, class_w or DEFAULT_CLASS_COL_WIDTH)
+    subclass_w = math.max(DEFAULT_SUBCLASS_COL_WIDTH, subclass_w or DEFAULT_SUBCLASS_COL_WIDTH)
+    grouped_w = math.max(DEFAULT_GROUPED_COL_WIDTH, grouped_w or DEFAULT_GROUPED_COL_WIDTH)
+    if class_w == class_col_width and subclass_w == subclass_col_width and grouped_w == grouped_col_width then
+        return false
+    end
+    class_col_width = class_w
+    subclass_col_width = subclass_w
+    grouped_col_width = grouped_w
+    self:update_column_layout()
+    return true
+end
+
+function LuaTrade:compute_column_widths(choices)
+    local max_class = #('Class')
+    local max_subclass = #('Subclass')
+    local max_grouped = #('Grouped')
+    for _, choice in ipairs(choices or {}) do
+        local d = choice.data or {}
+        local class_len = #(tostring(d.class or ''))
+        local subclass_len = #(tostring(d.subclass or ''))
+        local grouped_len = #(tostring(d.grouped or ''))
+        if class_len > max_class then max_class = class_len end
+        if subclass_len > max_subclass then max_subclass = subclass_len end
+        if grouped_len > max_grouped then max_grouped = grouped_len end
+    end
+    return max_class, max_subclass, max_grouped
+end
+
+function LuaTrade:update_choice_texts(choices)
+    for _, choice in ipairs(choices or {}) do
+        local d = choice.data or {}
+        local desc = d.is_group and '' or (d.desc or '')
+        local count = d.count or d.quantity or 1
+        choice.text = make_choice_text(d.value or 0, count, desc, d.class or '', d.subclass or '', d.grouped or '')
+    end
 end
 
 -- -------------------
