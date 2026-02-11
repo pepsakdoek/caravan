@@ -357,8 +357,10 @@ function LuaTrade:init()
 
     self.subviews.list.list.frame.t = 0
     self.subviews.list.edit = self.subviews.search_edit
-    self.subviews.search_edit.on_change = self.subviews.list:callback('onFilterChange')
-
+    self.subviews.search_edit.on_change = function(text)
+        self.subviews.list:onFilterChange(text)
+        self:refresh_list()
+    end
 
     self.search_active = false
     local list_widget = self.subviews.list.list
@@ -729,7 +731,7 @@ function LuaTrade:get_flat_choices()
     return choices
 end
 
-function LuaTrade:aggregate_choices(flat_choices)
+function LuaTrade:aggregate_choices(flat_choices, filter_str)
     if #self.path == 3 then
         -- Leaf level: Items
         local filtered = {}
@@ -746,6 +748,12 @@ function LuaTrade:aggregate_choices(flat_choices)
     local order = {}
     for _, choice in ipairs(flat_choices) do
         local d = choice.data
+
+        -- NEW: Only include items in the totals if they match the search filter
+        if filter_str and filter_str ~= '' and not choice.search_key:lower():find(filter_str, 1, true) then
+            goto continue
+        end
+
         local match = true
         for i, p in ipairs(self.path) do
             if i == 1 and d.class ~= p then match = false break end
@@ -791,6 +799,7 @@ function LuaTrade:aggregate_choices(flat_choices)
             end
             table.insert(g.items, choice)
         end
+        ::continue::
     end
     
     local choices = {}
@@ -851,7 +860,9 @@ end
 
 function LuaTrade:get_choices()
     local flat = self:get_flat_choices()
-    return self:aggregate_choices(flat)
+    -- Capture the search text from the edit field
+    local filter_str = self.subviews.search_edit.text:lower()
+    return self:aggregate_choices(flat, filter_str)
 end
 
 local function toggle_item_base(choice, target_value)
