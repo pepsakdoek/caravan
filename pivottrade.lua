@@ -597,8 +597,8 @@ local function make_choice_text(value, count, desc, class, subclass, grouped)
         {gap=1, width=COUNT_COL_WIDTH, rjustify=true, text=count},
         {gap=1, width=VALUE_COL_WIDTH, rjustify=true, text=common.obfuscate_value(value)},
         {gap=2, width=class_col_width, text=class, pen=COLOR_CYAN},   
-        {gap=2, width=subclass_col_width-1, text=subclass, pen=COLOR_GREY}, 
-        {gap=2, width=grouped_col_width-1, text=grouped, pen=COLOR_CYAN},
+        {gap=2, width=subclass_col_width, text=subclass, pen=COLOR_GREY}, 
+        {gap=2, width=grouped_col_width, text=grouped, pen=COLOR_CYAN},
         {gap=2, width=description_col_width, text=desc, pen=COLOR_GREY},
     } 
 end
@@ -1039,14 +1039,14 @@ function LuaTrade:update_column_layout()
     local base = STATUS_COL_WIDTH + 1 + COUNT_COL_WIDTH + 1 + VALUE_COL_WIDTH + 1
     local class_l = base
     local subclass_l = class_l + class_col_width + 1
-    local grouped_l = subclass_l + subclass_col_width + 1
-    local name_l = grouped_l + grouped_col_width + 2
+    local grouped_l = subclass_l + subclass_col_width + 2
+    local name_l = grouped_l + grouped_col_width + 3
 
     local sv = self.subviews.list_panel.subviews
     sv.sort_class.frame.w = class_col_width
     sv.sort_subclass.frame.w = subclass_col_width
     sv.sort_grouped.frame.w = grouped_col_width
-    sv.sort_name.frame.w = name_col_width
+    sv.sort_name.frame.w = description_col_width
 
     sv.sort_class.frame.l = class_l
     sv.sort_subclass.frame.l = subclass_l
@@ -1067,17 +1067,27 @@ function LuaTrade:set_column_widths(class_w, subclass_w, grouped_w, description_
     class_w = math.max(min_class, class_w or DEFAULT_CLASS_COL_WIDTH)
     subclass_w = math.max(min_subclass, subclass_w or DEFAULT_SUBCLASS_COL_WIDTH)
     grouped_w = math.max(min_grouped, grouped_w or DEFAULT_GROUPED_COL_WIDTH)
+    
+    -- Calculate how much width we've used for the metadata columns
+    local used_width = STATUS_COL_WIDTH + 1 + COUNT_COL_WIDTH + 1 + VALUE_COL_WIDTH + 1 
+                       + class_w + 2 + subclass_w + 2 + grouped_w + 2
+    
+    -- The description should take the remaining space. 
+    -- We subtract a small buffer (4-5) for scrollbars and margins.
     local winrect = self.frame
-    description_w = math.max(winrect.w - 3 - (STATUS_COL_WIDTH + 1 + COUNT_COL_WIDTH + 1 + VALUE_COL_WIDTH + 1 + class_w + 2 + subclass_w + 2 + grouped_w + 2 + 4), min_description)
+    local available_w = winrect.w - used_width - 5
+    description_w = math.max(min_description, available_w)
 
-    --description_w = math.max(DEFAULT_DESCRIPTION_COL_WIDTH, description_w or DEFAULT_DESCRIPTION_COL_WIDTH)
-    if class_w == class_col_width and subclass_w == subclass_col_width and grouped_w == grouped_col_width and description_w == description_col_width then
+    if class_w == class_col_width and subclass_w == subclass_col_width and 
+       grouped_w == grouped_col_width and description_w == description_col_width then
         return false
     end
+
     class_col_width = class_w
     subclass_col_width = subclass_w
     grouped_col_width = grouped_w
-    description_col_width = description_w
+    description_col_width = description_w + 5
+    
     self:update_column_layout()
     if not during_init then
        self:updateLayout()
@@ -1086,23 +1096,21 @@ function LuaTrade:set_column_widths(class_w, subclass_w, grouped_w, description_
 end
 
 function LuaTrade:compute_column_widths(choices)
-    local max_class = #('Class')+1
-    local max_subclass = #('Subclass')+1
-    local max_grouped = #('Grouped')+1
-    -- local description_width = #('Item Description')
-    local description_width = 99
+    local max_class = #('Class')
+    local max_subclass = #('Subclass')
+    local max_grouped = #('Grouped')
+    
     for _, choice in ipairs(choices or {}) do
         local d = choice.data or {}
-        local class_len = #(tostring(d.class or ''))+1
-        local subclass_len = #(tostring(d.subclass or ''))+1
-        local grouped_len = #(tostring(d.grouped or ''))+1
-        local desc_len = #(tostring(d.desc or ''))+1
-        if class_len > max_class then max_class = class_len end
-        if subclass_len > max_subclass then max_subclass = subclass_len end
-        if grouped_len > max_grouped then max_grouped = grouped_len end
-        if desc_len > description_width then description_width = desc_len end
+        -- Only measure if the fields exist to avoid nil errors
+        if d.class then max_class = math.max(max_class, #tostring(d.class)) end
+        if d.subclass then max_subclass = math.max(max_subclass, #tostring(d.subclass)) end
+        if d.grouped then max_grouped = math.max(max_grouped, #tostring(d.grouped)) end
     end
-    return max_class, max_subclass, max_grouped, description_width
+    
+    -- We no longer return a fixed 99 for description; 
+    -- set_column_widths will handle the "remaining space" logic.
+    return max_class, max_subclass, max_grouped, DEFAULT_DESCRIPTION_COL_WIDTH
 end
 
 function LuaTrade:update_choice_texts(choices)
