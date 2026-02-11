@@ -1084,8 +1084,8 @@ function LuaTrade:set_column_widths(class_w, subclass_w, grouped_w, description_
     end
 
     class_col_width = class_w
-    subclass_col_width = subclass_w
-    grouped_col_width = grouped_w
+    subclass_col_width = subclass_w+1
+    grouped_col_width = grouped_w+1
     description_col_width = description_w + 5
     
     self:update_column_layout()
