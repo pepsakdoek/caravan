@@ -37,19 +37,20 @@ local STATUS_COL_WIDTH = 2
 local COUNT_COL_WIDTH = 4
 local VALUE_COL_WIDTH = 6
 local FILTER_HEIGHT = 18
-local DEFAULT_CLASS_COL_WIDTH = 18
+local DEFAULT_CLASS_COL_WIDTH = 15
 local DEFAULT_SUBCLASS_COL_WIDTH = 15
-local DEFAULT_GROUPED_COL_WIDTH = 25
+local DEFAULT_GROUPED_COL_WIDTH = 15
+local DEFAULT_DESCRIPTION_COL_WIDTH = 30
+
 
 local class_col_width = DEFAULT_CLASS_COL_WIDTH
 local subclass_col_width = DEFAULT_SUBCLASS_COL_WIDTH
 local grouped_col_width = DEFAULT_GROUPED_COL_WIDTH
+local description_col_width = DEFAULT_DESCRIPTION_COL_WIDTH
+
 
 local function get_generic_description(item)
     local desc = dfhack.items.getReadableDescription(item)
-    -- local desc2 = dfhack.items.getDescription(item)
-
-    -- Pattern: ≡, -, +, *, #, (, ), {, }, [, ], <, >, «, »
     desc = desc:gsub("[%-%+%*#≡%(%){}%[%]<>%z\174\175\240]", "")
     
     -- Strip "left" and "right" specifically for shoes/gloves
@@ -298,7 +299,7 @@ function LuaTrade:init()
                 },
                 widgets.CycleHotkeyLabel{
                     view_id='sort_name',
-                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+class_col_width+2+subclass_col_width+2+grouped_col_width+2, w=30},
+                    frame={t=1, l=STATUS_COL_WIDTH+1+COUNT_COL_WIDTH+1+VALUE_COL_WIDTH+1+class_col_width+2+subclass_col_width+2+grouped_col_width+2, r=1},
                     options={
                         {label='Item Description', value=sorting.sort_noop},
                         {label='Item Description'..common.CH_DN, value=sorting.sort_by_name_desc},
@@ -546,12 +547,12 @@ function LuaTrade:refresh_list(sort_widget, sort_fn)
     list.list:on_scrollbar(math.max(0, saved_top - list.list.page_top))
 
     local auto_resize = self.subviews.auto_resize_cols:getOptionValue()
-    local class_w, subclass_w, grouped_w
+    local class_w, subclass_w, grouped_w, description_w
     if auto_resize then
         local visible = list:getVisibleChoices() or {}
-        class_w, subclass_w, grouped_w = self:compute_column_widths(visible)
+        class_w, subclass_w, grouped_w, description_w = self:compute_column_widths(visible)
     else
-        class_w, subclass_w, grouped_w = DEFAULT_CLASS_COL_WIDTH, DEFAULT_SUBCLASS_COL_WIDTH, DEFAULT_GROUPED_COL_WIDTH
+        class_w, subclass_w, grouped_w, description_w = DEFAULT_CLASS_COL_WIDTH, DEFAULT_SUBCLASS_COL_WIDTH, DEFAULT_GROUPED_COL_WIDTH, DEFAULT_DESCRIPTION_COL_WIDTH
     end
 
     if self:set_column_widths(class_w, subclass_w, grouped_w) then
@@ -1034,30 +1035,31 @@ function LuaTrade:update_column_layout()
     local grouped_l = base + class_col_width + 2 + subclass_col_width + 1
     local name_l = base + class_col_width + 2 + subclass_col_width + 2 + grouped_col_width + 2
 
-    self.subviews.sort_class.frame.w = class_col_width
-    self.subviews.sort_subclass.frame.w = subclass_col_width
-    self.subviews.sort_grouped.frame.w = grouped_col_width
+    local sv = self.subviews.list_panel.subviews
+    sv.sort_class.frame.w = class_col_width
+    sv.sort_subclass.frame.w = subclass_col_width
+    sv.sort_grouped.frame.w = grouped_col_width
 
-    self.subviews.sort_class.frame.l = class_l
-    self.subviews.sort_subclass.frame.l = subclass_l
-    self.subviews.sort_grouped.frame.l = grouped_l
-    self.subviews.sort_name.frame.l = name_l
-    if self.parent then
-        self:updateLayout()
-    end
+    sv.sort_class.frame.l = class_l
+    sv.sort_subclass.frame.l = subclass_l
+    sv.sort_grouped.frame.l = grouped_l
+    sv.sort_name.frame.l = name_l
 end
 
-function LuaTrade:set_column_widths(class_w, subclass_w, grouped_w)
+function LuaTrade:set_column_widths(class_w, subclass_w, grouped_w, description_w)
     class_w = math.max(DEFAULT_CLASS_COL_WIDTH, class_w or DEFAULT_CLASS_COL_WIDTH)
     subclass_w = math.max(DEFAULT_SUBCLASS_COL_WIDTH, subclass_w or DEFAULT_SUBCLASS_COL_WIDTH)
     grouped_w = math.max(DEFAULT_GROUPED_COL_WIDTH, grouped_w or DEFAULT_GROUPED_COL_WIDTH)
-    if class_w == class_col_width and subclass_w == subclass_col_width and grouped_w == grouped_col_width then
+    description_w = math.max(DEFAULT_DESCRIPTION_COL_WIDTH, description_w or DEFAULT_DESCRIPTION_COL_WIDTH)
+    if class_w == class_col_width and subclass_w == subclass_col_width and grouped_w == grouped_col_width and description_w == description_col_width then
         return false
     end
     class_col_width = class_w
     subclass_col_width = subclass_w
     grouped_col_width = grouped_w
+    description_col_width = description_w
     self:update_column_layout()
+    self:updateLayout()
     return true
 end
 
@@ -1065,16 +1067,19 @@ function LuaTrade:compute_column_widths(choices)
     local max_class = #('Class')
     local max_subclass = #('Subclass')
     local max_grouped = #('Grouped')
+    local description_width = #('Item Description')
     for _, choice in ipairs(choices or {}) do
         local d = choice.data or {}
         local class_len = #(tostring(d.class or ''))
         local subclass_len = #(tostring(d.subclass or ''))
         local grouped_len = #(tostring(d.grouped or ''))
+        local desc_len = #(tostring(d.desc or ''))
         if class_len > max_class then max_class = class_len end
         if subclass_len > max_subclass then max_subclass = subclass_len end
         if grouped_len > max_grouped then max_grouped = grouped_len end
+        if desc_len > description_width then description_width = desc_len end
     end
-    return max_class, max_subclass, max_grouped
+    return max_class, max_subclass, max_grouped, description_width
 end
 
 function LuaTrade:update_choice_texts(choices)
