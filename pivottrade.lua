@@ -27,7 +27,7 @@ local trade = df.global.game.main_interface.trade
 LuaTrade = defclass(LuaTrade, widgets.Window)
 LuaTrade.ATTRS {
     frame_title='Select trade goods',
-    frame={w=150, h=47},
+    frame={w=150, h=47, l=10, t=10},
     resizable=true,
     resize_min={w=48, h=40},
 }
@@ -37,17 +37,22 @@ local STATUS_COL_WIDTH = 2
 local COUNT_COL_WIDTH = 4
 local VALUE_COL_WIDTH = 6
 local FILTER_HEIGHT = 18
-local DEFAULT_CLASS_COL_WIDTH = 15
+local DEFAULT_CLASS_COL_WIDTH = 20
 local DEFAULT_SUBCLASS_COL_WIDTH = 15
-local DEFAULT_GROUPED_COL_WIDTH = 15
-local DEFAULT_DESCRIPTION_COL_WIDTH = 30
+local DEFAULT_GROUPED_COL_WIDTH = 20
+local DEFAULT_DESCRIPTION_COL_WIDTH = 50
+
+local MIN_CLASS_COL_WIDTH = #('Class')
+local MIN_SUBCLASS_COL_WIDTH = #('Subclass')
+local MIN_GROUPED_COL_WIDTH = #('Grouped')
+local MIN_DESCRIPTION_COL_WIDTH = #('Item Description')
 
 
 local class_col_width = DEFAULT_CLASS_COL_WIDTH
 local subclass_col_width = DEFAULT_SUBCLASS_COL_WIDTH
 local grouped_col_width = DEFAULT_GROUPED_COL_WIDTH
 local description_col_width = DEFAULT_DESCRIPTION_COL_WIDTH
-
+local during_init = false
 
 local function get_generic_description(item)
     local desc = dfhack.items.getReadableDescription(item)
@@ -68,6 +73,7 @@ end
 
 
 function LuaTrade:init()
+    during_init = true
     self.path = {}
     self.cur_page = 1
     self.filters = {'', ''}
@@ -420,6 +426,7 @@ function LuaTrade:init()
     end
 
     self:reset_cache()
+    during_init = false
 end
 
 function LuaTrade:activate_search()
@@ -555,7 +562,7 @@ function LuaTrade:refresh_list(sort_widget, sort_fn)
         class_w, subclass_w, grouped_w, description_w = DEFAULT_CLASS_COL_WIDTH, DEFAULT_SUBCLASS_COL_WIDTH, DEFAULT_GROUPED_COL_WIDTH, DEFAULT_DESCRIPTION_COL_WIDTH
     end
 
-    if self:set_column_widths(class_w, subclass_w, grouped_w) then
+    if self:set_column_widths(class_w, subclass_w, grouped_w, description_w, not auto_resize) then
         self:update_choice_texts(choices)
         list:setFilter('')
         list:setChoices(choices, list:getSelected())
@@ -589,10 +596,10 @@ local function make_choice_text(value, count, desc, class, subclass, grouped)
         {width=STATUS_COL_WIDTH-3, text=''},
         {gap=1, width=COUNT_COL_WIDTH, rjustify=true, text=count},
         {gap=1, width=VALUE_COL_WIDTH, rjustify=true, text=common.obfuscate_value(value)},
-        {gap=2, width=class_col_width, text=class, pen=COLOR_CYAN},     -- Added width
-        {gap=2, width=subclass_col_width, text=subclass, pen=COLOR_GREY}, -- Added width
-        {gap=2, width=grouped_col_width, text=grouped},
-        {gap=2, text=desc},
+        {gap=2, width=class_col_width, text=class, pen=COLOR_CYAN},   
+        {gap=2, width=subclass_col_width-1, text=subclass, pen=COLOR_GREY}, 
+        {gap=2, width=grouped_col_width-1, text=grouped, pen=COLOR_CYAN},
+        {gap=2, width=description_col_width, text=desc, pen=COLOR_GREY},
     } 
 end
 
@@ -1031,14 +1038,15 @@ end
 function LuaTrade:update_column_layout()
     local base = STATUS_COL_WIDTH + 1 + COUNT_COL_WIDTH + 1 + VALUE_COL_WIDTH + 1
     local class_l = base
-    local subclass_l = base + class_col_width + 1
-    local grouped_l = base + class_col_width + 2 + subclass_col_width + 1
-    local name_l = base + class_col_width + 2 + subclass_col_width + 2 + grouped_col_width + 2
+    local subclass_l = class_l + class_col_width + 1
+    local grouped_l = subclass_l + subclass_col_width + 1
+    local name_l = grouped_l + grouped_col_width + 2
 
     local sv = self.subviews.list_panel.subviews
     sv.sort_class.frame.w = class_col_width
     sv.sort_subclass.frame.w = subclass_col_width
     sv.sort_grouped.frame.w = grouped_col_width
+    sv.sort_name.frame.w = name_col_width
 
     sv.sort_class.frame.l = class_l
     sv.sort_subclass.frame.l = subclass_l
@@ -1046,11 +1054,23 @@ function LuaTrade:update_column_layout()
     sv.sort_name.frame.l = name_l
 end
 
-function LuaTrade:set_column_widths(class_w, subclass_w, grouped_w, description_w)
-    class_w = math.max(DEFAULT_CLASS_COL_WIDTH, class_w or DEFAULT_CLASS_COL_WIDTH)
-    subclass_w = math.max(DEFAULT_SUBCLASS_COL_WIDTH, subclass_w or DEFAULT_SUBCLASS_COL_WIDTH)
-    grouped_w = math.max(DEFAULT_GROUPED_COL_WIDTH, grouped_w or DEFAULT_GROUPED_COL_WIDTH)
-    description_w = math.max(DEFAULT_DESCRIPTION_COL_WIDTH, description_w or DEFAULT_DESCRIPTION_COL_WIDTH)
+function LuaTrade:set_column_widths(class_w, subclass_w, grouped_w, description_w, use_default_minimums)
+    if use_default_minimums == nil then
+        use_default_minimums = true
+    end
+
+    local min_class = use_default_minimums and DEFAULT_CLASS_COL_WIDTH or MIN_CLASS_COL_WIDTH
+    local min_subclass = use_default_minimums and DEFAULT_SUBCLASS_COL_WIDTH or MIN_SUBCLASS_COL_WIDTH
+    local min_grouped = use_default_minimums and DEFAULT_GROUPED_COL_WIDTH or MIN_GROUPED_COL_WIDTH
+    local min_description = use_default_minimums and DEFAULT_DESCRIPTION_COL_WIDTH or MIN_DESCRIPTION_COL_WIDTH
+
+    class_w = math.max(min_class, class_w or DEFAULT_CLASS_COL_WIDTH)
+    subclass_w = math.max(min_subclass, subclass_w or DEFAULT_SUBCLASS_COL_WIDTH)
+    grouped_w = math.max(min_grouped, grouped_w or DEFAULT_GROUPED_COL_WIDTH)
+    local winrect = self.frame
+    description_w = math.max(winrect.w - 3 - (STATUS_COL_WIDTH + 1 + COUNT_COL_WIDTH + 1 + VALUE_COL_WIDTH + 1 + class_w + 2 + subclass_w + 2 + grouped_w + 2 + 4), min_description)
+
+    --description_w = math.max(DEFAULT_DESCRIPTION_COL_WIDTH, description_w or DEFAULT_DESCRIPTION_COL_WIDTH)
     if class_w == class_col_width and subclass_w == subclass_col_width and grouped_w == grouped_col_width and description_w == description_col_width then
         return false
     end
@@ -1059,21 +1079,24 @@ function LuaTrade:set_column_widths(class_w, subclass_w, grouped_w, description_
     grouped_col_width = grouped_w
     description_col_width = description_w
     self:update_column_layout()
-    self:updateLayout()
+    if not during_init then
+       self:updateLayout()
+    end
     return true
 end
 
 function LuaTrade:compute_column_widths(choices)
-    local max_class = #('Class')
-    local max_subclass = #('Subclass')
-    local max_grouped = #('Grouped')
-    local description_width = #('Item Description')
+    local max_class = #('Class')+1
+    local max_subclass = #('Subclass')+1
+    local max_grouped = #('Grouped')+1
+    -- local description_width = #('Item Description')
+    local description_width = 99
     for _, choice in ipairs(choices or {}) do
         local d = choice.data or {}
-        local class_len = #(tostring(d.class or ''))
-        local subclass_len = #(tostring(d.subclass or ''))
-        local grouped_len = #(tostring(d.grouped or ''))
-        local desc_len = #(tostring(d.desc or ''))
+        local class_len = #(tostring(d.class or ''))+1
+        local subclass_len = #(tostring(d.subclass or ''))+1
+        local grouped_len = #(tostring(d.grouped or ''))+1
+        local desc_len = #(tostring(d.desc or ''))+1
         if class_len > max_class then max_class = class_len end
         if subclass_len > max_subclass then max_subclass = subclass_len end
         if grouped_len > max_grouped then max_grouped = grouped_len end
@@ -1091,11 +1114,12 @@ function LuaTrade:update_choice_texts(choices)
     end
 end
 
+-- THIS FUNCTION NEVER GETS CALLED
 function LuaTrade:resize_columns_for_visible_list()
     local list = self.subviews.list
     local visible = list:getVisibleChoices() or {}
     local class_w, subclass_w, grouped_w = self:compute_column_widths(visible)
-    if self:set_column_widths(class_w, subclass_w, grouped_w) then
+    if self:set_column_widths(class_w, subclass_w, grouped_w, nil, false) then
         self:update_choice_texts(visible)
     end
 end
